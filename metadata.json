@@ -1,0 +1,8 @@
+
+{
+  "name": "Unsaid - Your Daily Sanctuary",
+  "description": "A high-end personal diary and emotional companion. Unsaid provides a safe space for daily reflections, unsent letters, and human-like AI conversations.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
