@@ -5,8 +5,14 @@ interface DiaryProps {
   entries: Entry[];
 }
 
+type SortMode = "newest" | "oldest";
+type FilterType = "all" | "vent" | "reflection" | "letter";
+
 const Diary: React.FC<DiaryProps> = ({ entries }) => {
   const [query, setQuery] = useState("");
+  const [sortMode, setSortMode] = useState<SortMode>("newest");
+  const [filterType, setFilterType] = useState<FilterType>("all");
+  const [filterEmotion, setFilterEmotion] = useState<string>("all");
 
   // ✅ Helper: format day key (YYYY-MM-DD)
   const getDayKey = (ts: number) => {
@@ -16,13 +22,6 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
     const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   };
-
-  // ✅ Search filter (basic)
-  const filteredEntries = useMemo(() => {
-    if (!query.trim()) return entries;
-    const q = query.toLowerCase();
-    return entries.filter((e) => e.content.toLowerCase().includes(q));
-  }, [entries, query]);
 
   // ✅ Stats
   const totalEntries = entries.length;
@@ -65,16 +64,50 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [entries]);
 
-  const maxEmotionCount =
-    emotionStats.length > 0 ? emotionStats[0][1] : 1;
+  const maxEmotionCount = emotionStats.length > 0 ? emotionStats[0][1] : 1;
+
+  // ✅ For emotion dropdown options
+  const emotionOptions = useMemo(() => {
+    const set = new Set<string>();
+    entries.forEach((e) => {
+      e.emotions?.forEach((em) => set.add(em));
+    });
+    return Array.from(set).sort();
+  }, [entries]);
+
+  // ✅ Filter + Sort entries (MAIN LOGIC)
+  const filteredEntries = useMemo(() => {
+    let result = [...entries];
+
+    // ✅ sort
+    result.sort((a, b) =>
+      sortMode === "newest" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp
+    );
+
+    // ✅ search
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      result = result.filter((e) => e.content.toLowerCase().includes(q));
+    }
+
+    // ✅ type filter
+    if (filterType !== "all") {
+      result = result.filter((e) => e.type === filterType);
+    }
+
+    // ✅ emotion filter
+    if (filterEmotion !== "all") {
+      result = result.filter((e) => e.emotions?.includes(filterEmotion));
+    }
+
+    return result;
+  }, [entries, query, sortMode, filterType, filterEmotion]);
 
   return (
     <div className="space-y-8 fade-in">
       {/* ✅ Dashboard Card */}
       <div className="bg-white rounded-[2.5rem] p-8 border border-aura-100 shadow-sm">
-        <h2 className="text-2xl font-serif text-aura-900 italic">
-          Your Diary
-        </h2>
+        <h2 className="text-2xl font-serif text-aura-900 italic">Your Diary</h2>
         <p className="text-aura-400 text-sm mt-1">
           A calm record of your thoughts, feelings, and wins.
         </p>
@@ -84,27 +117,21 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
             <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
               Total Entries
             </p>
-            <p className="text-2xl font-serif text-aura-900 mt-1">
-              {totalEntries}
-            </p>
+            <p className="text-2xl font-serif text-aura-900 mt-1">{totalEntries}</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
             <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
               Today
             </p>
-            <p className="text-2xl font-serif text-aura-900 mt-1">
-              {todayEntriesCount}
-            </p>
+            <p className="text-2xl font-serif text-aura-900 mt-1">{todayEntriesCount}</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
             <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
               Streak
             </p>
-            <p className="text-2xl font-serif text-aura-900 mt-1">
-              {streak} 🔥
-            </p>
+            <p className="text-2xl font-serif text-aura-900 mt-1">{streak} 🔥</p>
           </div>
         </div>
 
@@ -142,24 +169,76 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
         </div>
       </div>
 
-      {/* ✅ Search */}
-      <div className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm">
-        <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest mb-3">
-          Search
+      {/* ✅ Search + Filters */}
+      <div className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm space-y-4">
+        <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
+          Search & Filter
         </p>
+
+        {/* Search */}
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search inside your diary..."
           className="w-full px-4 py-3 rounded-2xl border border-aura-200 outline-none font-serif text-aura-900 bg-aura-50/30 focus:ring-2 ring-aura-200"
         />
+
+        {/* Filters Row */}
+        <div className="grid grid-cols-3 gap-3">
+          {/* Type */}
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as FilterType)}
+            className="w-full px-3 py-3 rounded-2xl border border-aura-200 bg-white text-aura-800 text-sm font-bold"
+          >
+            <option value="all">All Types</option>
+            <option value="reflection">Reflection</option>
+            <option value="vent">Vent</option>
+            <option value="letter">Letter</option>
+          </select>
+
+          {/* Emotion */}
+          <select
+            value={filterEmotion}
+            onChange={(e) => setFilterEmotion(e.target.value)}
+            className="w-full px-3 py-3 rounded-2xl border border-aura-200 bg-white text-aura-800 text-sm font-bold"
+          >
+            <option value="all">All Emotions</option>
+            {emotionOptions.map((em) => (
+              <option key={em} value={em}>
+                {em}
+              </option>
+            ))}
+          </select>
+
+          {/* Sort */}
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            className="w-full px-3 py-3 rounded-2xl border border-aura-200 bg-white text-aura-800 text-sm font-bold"
+          >
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+          </select>
+        </div>
+
+        {/* Clear Filters */}
+        <button
+          onClick={() => {
+            setQuery("");
+            setFilterType("all");
+            setFilterEmotion("all");
+            setSortMode("newest");
+          }}
+          className="w-full py-3 rounded-2xl bg-aura-50 border border-aura-100 text-aura-700 font-bold text-sm hover:bg-aura-100 transition-all"
+        >
+          Clear Filters
+        </button>
       </div>
 
       {/* ✅ Entries */}
       <div className="space-y-4">
-        <h3 className="text-xl font-serif italic text-aura-900">
-          Your Entries
-        </h3>
+        <h3 className="text-xl font-serif italic text-aura-900">Your Entries</h3>
 
         {filteredEntries.length === 0 ? (
           <div className="bg-white rounded-[2.5rem] p-8 border border-aura-100 shadow-sm text-aura-400 text-sm">
