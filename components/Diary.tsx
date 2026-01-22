@@ -3,17 +3,21 @@ import { Entry } from "../types";
 
 interface DiaryProps {
   entries: Entry[];
+  onUpdateEntries: React.Dispatch<React.SetStateAction<Entry[]>>;
 }
 
 type SortMode = "newest" | "oldest";
 type FilterType = "all" | "vent" | "reflection" | "letter";
 
-const Diary: React.FC<DiaryProps> = ({ entries }) => {
+const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries }) => {
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [filterEmotion, setFilterEmotion] = useState<string>("all");
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+
+  // ✅ NEW: Lock Mode
+  const [lockMode, setLockMode] = useState(false);
 
   // ✅ Helper: day key
   const getDayKey = (ts: number) => {
@@ -27,7 +31,9 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
   // ✅ Stats
   const totalEntries = entries.length;
   const todayKey = getDayKey(Date.now());
-  const todayEntriesCount = entries.filter((e) => getDayKey(e.timestamp) === todayKey).length;
+  const todayEntriesCount = entries.filter(
+    (e) => getDayKey(e.timestamp) === todayKey
+  ).length;
 
   // ✅ Streak
   const streak = useMemo(() => {
@@ -77,39 +83,81 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
   const filteredEntries = useMemo(() => {
     let result = [...entries];
 
-    // remove pinned from list to avoid duplicate view
+    // ✅ Remove pinned from list to avoid duplicate view
     if (pinnedEntry) {
       result = result.filter((e) => e.id !== pinnedEntry.id);
     }
 
-    // sort
+    // ✅ sort
     result.sort((a, b) =>
       sortMode === "newest" ? b.timestamp - a.timestamp : a.timestamp - b.timestamp
     );
 
-    // search
+    // ✅ search
     if (query.trim()) {
       const q = query.toLowerCase();
       result = result.filter((e) => e.content.toLowerCase().includes(q));
     }
 
-    // type filter
+    // ✅ type filter
     if (filterType !== "all") {
       result = result.filter((e) => e.type === filterType);
     }
 
-    // emotion filter
+    // ✅ emotion filter
     if (filterEmotion !== "all") {
       result = result.filter((e) => e.emotions?.includes(filterEmotion));
     }
 
-    // favorites only
+    // ✅ favorites only
     if (showOnlyFavorites) {
       result = result.filter((e) => e.isFavorite);
     }
 
     return result;
   }, [entries, query, sortMode, filterType, filterEmotion, showOnlyFavorites, pinnedEntry]);
+
+  // ✅ PIN function (only one pin)
+  const pinEntry = (id: string) => {
+    onUpdateEntries((prev) =>
+      prev.map((e) => {
+        if (e.id === id) return { ...e, isPinned: true };
+        return { ...e, isPinned: false };
+      })
+    );
+  };
+
+  // ✅ FAV function
+  const toggleFavorite = (id: string) => {
+    onUpdateEntries((prev) =>
+      prev.map((e) =>
+        e.id === id ? { ...e, isFavorite: !e.isFavorite } : e
+      )
+    );
+  };
+
+  // ✅ Export to TXT
+  const exportDiaryTxt = () => {
+    const sorted = [...entries].sort((a, b) => b.timestamp - a.timestamp);
+
+    const txt = sorted
+      .map((e) => {
+        const date = new Date(e.timestamp).toLocaleString();
+        const emotions = e.emotions && e.emotions.length > 0 ? e.emotions.join(", ") : "None";
+        return `TYPE: ${e.type}\nDATE: ${date}\nEMOTIONS: ${emotions}\n\n${e.content}\n\n------------------------------\n`;
+      })
+      .join("\n");
+
+    const blob = new Blob([txt], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "unsaid-diary.txt";
+    a.click();
+
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-8 fade-in">
@@ -122,15 +170,23 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
 
         <div className="grid grid-cols-3 gap-3 mt-6">
           <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
-            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">Total</p>
+            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
+              Total
+            </p>
             <p className="text-2xl font-serif text-aura-900 mt-1">{totalEntries}</p>
           </div>
+
           <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
-            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">Today</p>
+            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
+              Today
+            </p>
             <p className="text-2xl font-serif text-aura-900 mt-1">{todayEntriesCount}</p>
           </div>
+
           <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
-            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">Streak</p>
+            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
+              Streak
+            </p>
             <p className="text-2xl font-serif text-aura-900 mt-1">{streak} 🔥</p>
           </div>
         </div>
@@ -140,6 +196,7 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
           <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest mb-3">
             Mood Map
           </p>
+
           {emotionStats.length === 0 ? (
             <p className="text-aura-400 text-sm">No emotion tags yet 💙</p>
           ) : (
@@ -153,7 +210,10 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
                       <span>{count}</span>
                     </div>
                     <div className="w-full h-3 bg-aura-50 border border-aura-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-aura-600 rounded-full" style={{ width: `${width}%` }} />
+                      <div
+                        className="h-full bg-aura-600 rounded-full"
+                        style={{ width: `${width}%` }}
+                      />
                     </div>
                   </div>
                 );
@@ -170,13 +230,20 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
             <p className="text-[10px] font-bold uppercase tracking-widest text-aura-200">
               Pinned Entry 📌
             </p>
-            <p className="font-serif text-xl mt-3 leading-relaxed whitespace-pre-wrap">
+
+            <p
+              className={`font-serif text-xl mt-3 leading-relaxed whitespace-pre-wrap transition-all ${
+                lockMode ? "blur-sm select-none" : ""
+              }`}
+            >
               {pinnedEntry.content}
             </p>
+
             <p className="text-aura-200 text-xs mt-4 font-bold">
               {new Date(pinnedEntry.timestamp).toLocaleString()}
             </p>
           </div>
+
           <div className="absolute right-[-20px] bottom-[-20px] opacity-10">
             <svg className="w-40 h-40 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
@@ -245,6 +312,27 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
           {showOnlyFavorites ? "Showing Favourites ⭐" : "Show Only Favourites ⭐"}
         </button>
 
+        {/* ✅ Lock mode */}
+        <button
+          onClick={() => setLockMode((p) => !p)}
+          className={`w-full py-3 rounded-2xl border font-bold text-sm transition-all ${
+            lockMode
+              ? "bg-aura-800 text-white border-aura-800"
+              : "bg-white text-aura-700 border-aura-200 hover:bg-aura-50"
+          }`}
+        >
+          {lockMode ? "🔒 Lock Mode ON" : "🔓 Turn ON Lock Mode"}
+        </button>
+
+        {/* ✅ Export */}
+        <button
+          onClick={exportDiaryTxt}
+          className="w-full py-3 rounded-2xl bg-white border border-aura-200 text-aura-700 font-bold text-sm hover:bg-aura-50 transition-all"
+        >
+          📤 Export Diary (.txt)
+        </button>
+
+        {/* ✅ Clear */}
         <button
           onClick={() => {
             setQuery("");
@@ -269,7 +357,10 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
           </div>
         ) : (
           filteredEntries.map((entry) => (
-            <div key={entry.id} className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm">
+            <div
+              key={entry.id}
+              className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm"
+            >
               <div className="flex justify-between items-center mb-3">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-aura-400">
                   {entry.type}
@@ -279,7 +370,11 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
                 </span>
               </div>
 
-              <p className="text-aura-900 font-serif text-lg leading-relaxed whitespace-pre-wrap">
+              <p
+                className={`text-aura-900 font-serif text-lg leading-relaxed whitespace-pre-wrap transition-all ${
+                  lockMode ? "blur-sm select-none" : ""
+                }`}
+              >
                 {entry.content}
               </p>
 
@@ -299,32 +394,21 @@ const Diary: React.FC<DiaryProps> = ({ entries }) => {
               {/* ✅ Pinned + Favourite UI */}
               <div className="flex gap-2 mt-5">
                 <button
-                  onClick={() => {
-                    // ✅ Only one pinned at a time (localStorage entries update happens in App.tsx later)
-                    const updated = entries.map((e) => {
-                      if (e.id === entry.id) return { ...e, isPinned: true };
-                      return { ...e, isPinned: false };
-                    });
-                    localStorage.setItem("UNSAID_ENTRIES_OVERRIDE", JSON.stringify(updated));
-                    window.location.reload();
-                  }}
+                  onClick={() => pinEntry(entry.id)}
                   className="flex-1 py-3 rounded-2xl bg-aura-50 border border-aura-100 text-aura-700 font-bold text-sm hover:bg-aura-100 transition-all"
                 >
                   📌 Pin
                 </button>
 
                 <button
-                  onClick={() => {
-                    const updated = entries.map((e) => {
-                      if (e.id === entry.id) return { ...e, isFavorite: !e.isFavorite };
-                      return e;
-                    });
-                    localStorage.setItem("UNSAID_ENTRIES_OVERRIDE", JSON.stringify(updated));
-                    window.location.reload();
-                  }}
-                  className="flex-1 py-3 rounded-2xl bg-aura-800 text-white border border-aura-800 font-bold text-sm hover:bg-aura-900 transition-all"
+                  onClick={() => toggleFavorite(entry.id)}
+                  className={`flex-1 py-3 rounded-2xl border font-bold text-sm transition-all ${
+                    entry.isFavorite
+                      ? "bg-aura-800 text-white border-aura-800 hover:bg-aura-900"
+                      : "bg-white text-aura-700 border-aura-200 hover:bg-aura-50"
+                  }`}
                 >
-                  ⭐ Favourite
+                  {entry.isFavorite ? "⭐ Favourited" : "⭐ Favourite"}
                 </button>
               </div>
             </div>

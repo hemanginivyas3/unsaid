@@ -115,7 +115,12 @@ const App: React.FC = () => {
         );
 
       case "diary":
-        return <Diary entries={entries} />;
+  return (
+    <Diary
+      entries={entries}
+      onUpdateEntries={setEntries}
+    />
+  );
 
       case "letter":
         return (
