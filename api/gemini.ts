@@ -15,11 +15,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
     if (!GEMINI_API_KEY) {
-      return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY in Vercel env" });
     }
 
-    // ✅ MOST COMPATIBLE MODEL (works for most keys)
-    const MODEL = "gemini-1.0-pro";
+    // ✅ Use a working model
+    const MODEL = "gemini-1.5-flash";
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`,
@@ -29,9 +29,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         body: JSON.stringify({
           contents: [
             {
+              role: "user",
               parts: [{ text }],
             },
           ],
+          generationConfig: {
+            temperature: 0.9,
+            maxOutputTokens: 250,
+          },
         }),
       }
     );
@@ -39,19 +44,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.log("❌ Gemini Error Body:", JSON.stringify(data));
+      console.log("Gemini error:", data);
       return res.status(500).json({
-        error: data?.error?.message || "Gemini API failed",
+        error: data?.error?.message || "Gemini request failed",
       });
     }
 
     const aiText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-      "I’m here with you. Tell me more.";
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "I’m here with you 💙 Tell me a little more.";
 
     return res.status(200).json({ reply: aiText });
-  } catch (err) {
-    console.error("❌ Server crash:", err);
-    return res.status(500).json({ error: "Server crashed" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Something went wrong" });
   }
 }
