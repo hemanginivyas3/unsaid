@@ -1,3 +1,4 @@
+import Calendar from "./components/Calendar";
 import Journal from "./components/Journal";
 import NameSetup from "./NameSetup";
 import { getUserProfile } from "./userService";
@@ -101,6 +102,9 @@ const App: React.FC = () => {
     switch (activeView) {
       case "home":
         return <Home onViewChange={setActiveView} />;
+
+      case "calendar":
+        return <Calendar entries={entries} />;
 
       case "listener":
         return (

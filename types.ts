@@ -12,7 +12,7 @@ export enum EmotionType {
   Grateful = 'Grateful'
 }
 
-export type ViewMode = 'login' | 'home' | 'listener' | 'diary' | 'letter' | 'profile';
+export type ViewMode = 'login' | 'home' | 'listener' | 'diary' | 'letter' | 'calendar' | 'profile';
 
 export interface Entry {
   id: string;
