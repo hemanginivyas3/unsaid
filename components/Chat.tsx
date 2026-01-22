@@ -70,7 +70,7 @@ const Chat: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: userMsg,
-          history: buildHistory(),
+          history: messages.slice(-8), // ✅ gives context so replies are not repeated
         }),
       });
 
