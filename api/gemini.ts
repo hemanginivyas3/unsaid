@@ -6,57 +6,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { text } = req.body as { text?: string };
+    const { text } = req.body;
 
-    if (!text || !text.trim()) {
+    if (!text || typeof text !== "string") {
       return res.status(400).json({ error: "No text provided" });
     }
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
     if (!GEMINI_API_KEY) {
-      return res.status(500).json({ error: "GEMINI_API_KEY missing in env" });
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
-    const prompt = `
-You are Unsaid, a calm, kind, human-like companion.
-Reply naturally, warmly and helpfully in 2-5 lines.
-Do NOT repeat the same sentence again and again.
-Always answer properly and ask 1 gentle follow-up question.
-
-User: ${text}
-Unsaid:
-`;
+    // ✅ FIXED MODEL NAME (works)
+    const MODEL = "gemini-1.5-flash";
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.9,
-            maxOutputTokens: 220,
-          },
+          contents: [{ parts: [{ text }] }],
         }),
       }
     );
 
     const data = await response.json();
 
+    // ✅ If Google returns an API error, show it
     if (!response.ok) {
-      console.log("❌ Gemini Error:", JSON.stringify(data));
-      return res.status(500).json({ error: "Gemini error", details: data });
+      console.log("Gemini API Error Body:", data);
+      return res.status(response.status).json({
+        error: data?.error?.message || "Gemini API failed",
+      });
     }
 
     const aiText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-      "I’m here with you 💙 Tell me what’s bothering you most right now.";
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "I’m here with you. Tell me more.";
 
     return res.status(200).json({ reply: aiText });
   } catch (error) {
-    console.error("❌ /api/gemini error:", error);
+    console.error("API crash:", error);
     return res.status(500).json({ error: "Something went wrong" });
   }
 }
