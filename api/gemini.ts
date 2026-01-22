@@ -15,35 +15,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
     if (!GEMINI_API_KEY) {
-      return res
-        .status(500)
-        .json({ error: "GEMINI_API_KEY missing in Vercel env" });
+      return res.status(500).json({ error: "GEMINI_API_KEY missing in env" });
     }
-
-    console.log("✅ API HIT /api/gemini");
-    console.log("✅ Using model: gemini-pro");
 
     const prompt = `
 You are Unsaid, a calm, kind, human-like companion.
-Reply naturally and helpfully in 2-5 lines.
-Avoid repeating the same phrase.
-Always give a helpful answer + 1 gentle follow-up question.
+Reply naturally, warmly and helpfully in 2-5 lines.
+Do NOT repeat the same sentence again and again.
+Always answer properly and ask 1 gentle follow-up question.
 
-User message: ${text}
+User: ${text}
+Unsaid:
 `;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.9,
-            maxOutputTokens: 200,
+            maxOutputTokens: 220,
           },
         }),
       }
@@ -58,11 +52,11 @@ User message: ${text}
 
     const aiText =
       data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-      "I’m here with you 💙 What do you want to do next — relax or fix the boredom?";
+      "I’m here with you 💙 Tell me what’s bothering you most right now.";
 
     return res.status(200).json({ reply: aiText });
   } catch (error) {
-    console.error("❌ api/gemini.ts error:", error);
+    console.error("❌ /api/gemini error:", error);
     return res.status(500).json({ error: "Something went wrong" });
   }
 }
