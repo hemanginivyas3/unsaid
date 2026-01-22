@@ -18,8 +18,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
-    // ✅ This model works in v1beta
-    const MODEL = "gemini-1.5-flash";
+    // ✅ MOST COMPATIBLE MODEL (works for most keys)
+    const MODEL = "gemini-1.0-pro";
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`,
@@ -29,23 +29,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         body: JSON.stringify({
           contents: [
             {
-              role: "user",
               parts: [{ text }],
             },
           ],
-          generationConfig: {
-            temperature: 0.9,
-            maxOutputTokens: 200,
-          },
         }),
       }
     );
 
     const data = await response.json();
 
-    // ✅ If Gemini fails, return the error (not fallback)
     if (!response.ok) {
-      console.log("❌ Gemini API Error:", data);
+      console.log("❌ Gemini Error Body:", JSON.stringify(data));
       return res.status(500).json({
         error: data?.error?.message || "Gemini API failed",
       });
@@ -61,4 +55,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "Server crashed" });
   }
 }
-
