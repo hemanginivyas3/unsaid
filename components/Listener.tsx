@@ -134,10 +134,12 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
 
     try {
       await saveEmotionEntry({
-        userId: uid,
-        userText: text,
-        aiReply: "", // ✅ NO AI now
+       userId: uid,
+       userText: text,
+       type: mode === "reflection" ? "reflection" : "vent",
+       emotions: selectedEmotions,
       });
+
 
       setShowEmotions(true);
       setInfoMsg("");
