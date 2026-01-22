@@ -154,8 +154,19 @@ const App: React.FC = () => {
   }
 
   if (profileLoading) {
-    return <div style={{ padding: 20 }}>Loading profile...</div>;
-  }
+  return <div style={{ padding: 20 }}>Loading profile...</div>;
+}
+
+// ✅ if profile doesn't exist, go to NameSetup
+if (!userName) {
+  return (
+    <NameSetup
+      uid={firebaseUser.uid}
+      onDone={(name) => setUserName(name)}
+    />
+  );
+}
+
 
   if (!userName) {
     return (
