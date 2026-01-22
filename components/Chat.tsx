@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChatMessage } from "../types";
 
 import { auth } from "../firebase";
@@ -6,7 +6,7 @@ import { canUseGemini, incrementGeminiUsage } from "../usageService";
 
 const Chat: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "model", text: "I'm here if you want to talk. How has your day truly been?" },
+    { role: "model", text: "I’m here with you 💙 Take your time. What’s been on your mind today?" },
   ]);
 
   const [input, setInput] = useState("");
@@ -23,10 +23,9 @@ const Chat: React.FC = () => {
   }, [messages, isLoading]);
 
   const buildHistory = () => {
-    // ✅ Send last 8 messages (excluding typing loader)
-    const recent = messages.slice(-8);
-    return recent.map((m) => ({
-      role: m.role, // "user" | "model"
+    // ✅ last 8 messages only (good for cost + context)
+    return messages.slice(-8).map((m) => ({
+      role: m.role === "user" ? "user" : "model",
       text: m.text,
     }));
   };
@@ -57,14 +56,18 @@ const Chat: React.FC = () => {
 
     const userMsg = input.trim();
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
+
+    const newMessages: ChatMessage[] = [...messages, { role: "user", text: userMsg }];
+    setMessages(newMessages);
+
     setIsLoading(true);
+    setInfoMsg("");
 
     try {
+      // ✅ send text + history
       const res = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // ✅ IMPORTANT: send history now
         body: JSON.stringify({
           text: userMsg,
           history: buildHistory(),
@@ -72,28 +75,21 @@ const Chat: React.FC = () => {
       });
 
       const data = await res.json();
-
-      let aiText =
-        data?.reply ||
-        "I’m here with you. Tell me more.";
-
-      // ✅ If AI repeats same line too much, force variety
-      if (
-        aiText.toLowerCase().includes("tell me more") &&
-        userMsg.length < 10
-      ) {
-        aiText = "I’m here with you 💙 Take your time. What’s been on your mind today?";
-      }
+      const aiText = data?.reply || "I’m here with you 💙 Want comfort or a solution right now?";
 
       await incrementGeminiUsage(uid);
 
       setMessages((prev) => [...prev, { role: "model", text: aiText }]);
+
       setInfoMsg(`✅ You have ${Math.max(usage.remaining - 1, 0)} messages left today.`);
     } catch (e) {
       console.error(e);
       setMessages((prev) => [
         ...prev,
-        { role: "model", text: "I’m having a quiet moment, but I’m still here with you." },
+        {
+          role: "model",
+          text: "I’m having a quiet moment, but I’m still here with you 💙",
+        },
       ]);
       setInfoMsg("❌ Something went wrong. Please try again.");
     } finally {
@@ -132,9 +128,7 @@ const Chat: React.FC = () => {
       </div>
 
       <div className="p-4 bg-aura-50/50 border-t border-aura-100">
-        {infoMsg && (
-          <p className="text-center text-sm text-aura-500 mb-2">{infoMsg}</p>
-        )}
+        {infoMsg && <p className="text-center text-sm text-aura-500 mb-2">{infoMsg}</p>}
 
         <div className="flex gap-2 bg-white rounded-2xl border border-aura-200 p-2 focus-within:ring-2 ring-aura-200 transition-all">
           <input
