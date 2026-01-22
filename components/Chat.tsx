@@ -75,7 +75,16 @@ const Chat: React.FC = () => {
       });
 
       const data = await res.json();
-      const aiText = data?.reply || "I’m here with you 💙 Want comfort or a solution right now?";
+      if (data?.error) {
+  setMessages((prev) => [
+    ...prev,
+    { role: "model", text: "⚠️ AI is down right now. Please try again in 1 minute." },
+  ]);
+  setInfoMsg("Gemini error: " + data.error);
+  return;
+}
+
+const aiText = data?.reply || "I’m here with you. Tell me more.";
 
       await incrementGeminiUsage(uid);
 

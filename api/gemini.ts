@@ -18,7 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
-    // ✅ FIXED MODEL NAME (works)
+    // ✅ This model works in v1beta
     const MODEL = "gemini-1.5-flash";
 
     const response = await fetch(
@@ -27,28 +27,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text }] }],
+          contents: [
+            {
+              role: "user",
+              parts: [{ text }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.9,
+            maxOutputTokens: 200,
+          },
         }),
       }
     );
 
     const data = await response.json();
 
-    // ✅ If Google returns an API error, show it
+    // ✅ If Gemini fails, return the error (not fallback)
     if (!response.ok) {
-      console.log("Gemini API Error Body:", data);
-      return res.status(response.status).json({
+      console.log("❌ Gemini API Error:", data);
+      return res.status(500).json({
         error: data?.error?.message || "Gemini API failed",
       });
     }
 
     const aiText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
       "I’m here with you. Tell me more.";
 
     return res.status(200).json({ reply: aiText });
-  } catch (error) {
-    console.error("API crash:", error);
-    return res.status(500).json({ error: "Something went wrong" });
+  } catch (err) {
+    console.error("❌ Server crash:", err);
+    return res.status(500).json({ error: "Server crashed" });
   }
 }
+
