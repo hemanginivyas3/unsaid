@@ -13,14 +13,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
     if (!GEMINI_API_KEY) {
       return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
-    // ✅ ONLY FREE + STABLE MODEL
-    const MODEL = "gemini-1.0-pro";
+    // ✅ THIS IS THE MAIN FIX
+    // Use v1beta endpoint + valid model
+    const MODEL = "gemini-1.5-flash";
 
-    const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+    const url =
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
     const response = await fetch(url, {
       method: "POST",
@@ -28,17 +31,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({
         contents: [
           {
-            parts: [{ text }]
-          }
-        ]
+            role: "user",
+            parts: [{ text }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.9,
+          maxOutputTokens: 300,
+        },
       }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("❌ Gemini error:", data);
-      return res.status(500).json({ error: "Gemini API error", details: data });
+      console.error("❌ Gemini error body:", data);
+      return res.status(500).json({
+        error: "Gemini API error",
+        details: data,
+      });
     }
 
     const reply =
@@ -46,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       "I’m here with you. Tell me more.";
 
     return res.status(200).json({ reply });
-  } catch (err: any) {
+  } catch (err) {
     console.error("❌ Server error:", err);
     return res.status(500).json({ error: "Server crashed" });
   }
