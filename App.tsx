@@ -12,7 +12,7 @@ import Listener from "./components/Listener";
 import Diary from "./components/Diary";
 import Letter from "./components/Letter";
 import Profile from "./components/Profile";
-import Chat from "./components/Chat";
+
 
 import { ViewMode, Entry } from "./types";
 
@@ -131,8 +131,7 @@ const App: React.FC = () => {
           />
         );
 
-      case "chat":
-        return <Chat />;
+
 
       default:
         return <Home onViewChange={setActiveView} />;
