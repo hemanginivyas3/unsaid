@@ -1,6 +1,5 @@
-
-import React, { useState } from 'react';
-import { Entry } from '../types';
+import React, { useEffect, useRef, useState } from "react";
+import { Entry } from "../types";
 
 interface LetterProps {
   onSave: (entry: Partial<Entry>) => void;
@@ -8,58 +7,123 @@ interface LetterProps {
 }
 
 const Letter: React.FC<LetterProps> = ({ onSave, onClose }) => {
-  const [recipient, setRecipient] = useState('');
-  const [content, setContent] = useState('');
+  const [text, setText] = useState("");
+  const [burning, setBurning] = useState(false);
+  const [burnDone, setBurnDone] = useState(false);
 
-  const handleSave = () => {
-    if (!content.trim()) return;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
+  const handleSaveLetter = () => {
+    if (!text.trim()) return;
+
     onSave({
-      content: `To: ${recipient || 'Unknown'}\n\n${content}`,
-      type: 'letter',
-      timestamp: Date.now()
+      content: text,
+      type: "letter",
+      emotions: [],
     });
+
     onClose();
+  };
+
+  const handleBurnLetter = async () => {
+    if (!text.trim()) return;
+
+    setBurning(true);
+
+    // 🔥 small dramatic burn delay
+    setTimeout(() => {
+      setBurnDone(true);
+      setText("");
+    }, 1800);
+
+    // close after burn
+    setTimeout(() => {
+      setBurning(false);
+      setBurnDone(false);
+      onClose();
+    }, 2600);
   };
 
   return (
     <div className="flex-1 flex flex-col fade-in">
-      <div className="mb-8 space-y-3">
-        <h2 className="text-3xl font-serif text-aura-800 italic">Unsent Letter</h2>
-        <p className="text-aura-500 leading-relaxed max-w-lg">Release the words you've been holding. Whether for someone else or your own heart, these are your secrets.</p>
-      </div>
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-3xl font-serif text-aura-900 italic">
+          Secret Letter
+        </h2>
 
-      <div className="flex-1 bg-white rounded-[2.5rem] p-10 border border-aura-100 shadow-sm flex flex-col">
-        <input
-          type="text"
-          value={recipient}
-          onChange={(e) => setRecipient(e.target.value)}
-          placeholder="To whom..."
-          className="w-full mb-8 py-3 border-b border-aura-50 text-aura-800 font-serif text-xl focus:outline-none focus:border-aura-300 bg-transparent placeholder-aura-100"
-        />
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="I've been meaning to say..."
-          className="w-full flex-1 resize-none bg-transparent focus:outline-none font-serif text-aura-900 leading-relaxed text-xl placeholder-aura-100"
-        />
-      </div>
-
-      <div className="mt-8 flex justify-end items-center gap-6">
         <button
           onClick={onClose}
-          className="px-6 py-3 text-aura-400 hover:text-aura-600 font-medium transition-colors"
+          className="text-aura-400 font-bold text-sm hover:text-aura-700 transition-all"
         >
-          Discard
+          Close
         </button>
-        <button
-          onClick={handleSave}
-          disabled={!content.trim()}
-          className={`px-12 py-4 rounded-2xl bg-aura-800 text-white font-bold shadow-xl transition-all ${
-            !content.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-aura-900 active:scale-95'
-          }`}
-        >
-          Release & Save
-        </button>
+      </div>
+
+      <div className="flex-1 relative flex flex-col bg-white rounded-[2.5rem] p-8 border border-aura-100 shadow-inner overflow-hidden">
+        {/* ✅ Burn overlay */}
+        {burning && (
+          <div className="absolute inset-0 bg-black/10 backdrop-blur-sm flex items-center justify-center z-20">
+            <div className="bg-white rounded-[2.5rem] p-8 border border-aura-100 shadow-xl text-center max-w-sm mx-auto">
+              {!burnDone ? (
+                <>
+                  <div className="text-4xl mb-2">🔥</div>
+                  <p className="text-aura-900 font-serif text-xl italic">
+                    Burning your letter...
+                  </p>
+                  <p className="text-aura-400 text-sm mt-2">
+                    Let it go. You don’t need to carry it.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="text-4xl mb-2">✨</div>
+                  <p className="text-aura-900 font-serif text-xl italic">
+                    It’s gone.
+                  </p>
+                  <p className="text-aura-400 text-sm mt-2">
+                    You’re lighter now.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Write what you can’t say out loud..."
+          className="w-full flex-1 bg-transparent text-xl text-aura-900 placeholder-aura-200 focus:outline-none resize-none font-serif leading-relaxed"
+        />
+
+        <div className="flex gap-3 mt-4">
+          {/* ✅ Save */}
+          <button
+            onClick={handleSaveLetter}
+            disabled={!text.trim() || burning}
+            className="flex-1 px-6 py-4 bg-aura-800 text-white rounded-2xl font-bold shadow-lg disabled:opacity-30 hover:bg-aura-900 transition-all"
+          >
+            Seal & Save 💙
+          </button>
+
+          {/* ✅ Burn */}
+          <button
+            onClick={handleBurnLetter}
+            disabled={!text.trim() || burning}
+            className="flex-1 px-6 py-4 bg-white text-aura-800 rounded-2xl font-bold shadow-lg border border-aura-200 disabled:opacity-30 hover:bg-aura-50 transition-all"
+          >
+            Burn 🔥
+          </button>
+        </div>
+
+        <p className="text-center text-aura-300 text-xs font-bold mt-4 uppercase tracking-widest">
+          Your words stay yours.
+        </p>
       </div>
     </div>
   );
