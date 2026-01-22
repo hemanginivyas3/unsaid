@@ -14,11 +14,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
-      return res.status(500).json({ error: "Missing GEMINI_API_KEY in Vercel env vars" });
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
-    // ✅ Use a valid model for the v1 endpoint
-    const MODEL = "gemini-1.5-flash-latest";
+    // ✅ ONLY FREE + STABLE MODEL
+    const MODEL = "gemini-1.0-pro";
 
     const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
@@ -26,28 +26,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text }] }],
-        generationConfig: {
-          temperature: 0.9,
-          maxOutputTokens: 250,
-        },
+        contents: [
+          {
+            parts: [{ text }]
+          }
+        ]
       }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.log("❌ Gemini error body:", data);
+      console.error("❌ Gemini error:", data);
       return res.status(500).json({ error: "Gemini API error", details: data });
     }
 
-    const aiText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
+    const reply =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "I’m here with you. Tell me more.";
 
-    return res.status(200).json({ reply: aiText });
+    return res.status(200).json({ reply });
   } catch (err: any) {
-    console.log("❌ Server crash:", err?.message || err);
-    return res.status(500).json({ error: "Server crashed", details: String(err?.message || err) });
+    console.error("❌ Server error:", err);
+    return res.status(500).json({ error: "Server crashed" });
   }
 }
