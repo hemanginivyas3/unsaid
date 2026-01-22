@@ -18,6 +18,9 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
 
+  // ✅ Speech recognition ref
+  const recognitionRef = useRef<any>(null);
+
   const [mode, setMode] = useState<"listen-respond" | "just-listen">(
     "listen-respond"
   );
@@ -32,8 +35,48 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // ✅ Focus cursor in textarea
   useEffect(() => {
     if (textareaRef.current) textareaRef.current.focus();
+  }, []);
+
+  // ✅ REAL MIC SETUP (this triggers permission popup on start)
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      console.warn("SpeechRecognition not supported in this browser");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-IN";
+
+    recognition.onresult = (event: any) => {
+      let newText = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        newText += transcript;
+      }
+
+      setText((prev) => (prev ? prev + " " + newText : newText));
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Mic error:", event.error);
+      setInfoMsg("❌ Mic error. Please allow microphone permission.");
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    recognitionRef.current = recognition;
   }, []);
 
   const toggleEmotion = (emotion: EmotionType) => {
@@ -84,7 +127,7 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
         // ✅ Count usage only after successful AI reply
         await incrementGeminiUsage(uid);
 
-        // ✅ Save to Firestore (user's emotional entry)
+        // ✅ Save to Firestore
         await saveEmotionEntry({
           userId: uid,
           userText: text,
@@ -95,10 +138,7 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
         setShowEmotions(true);
 
         setInfoMsg(
-          `✅ Saved. You have ${Math.max(
-            usage.remaining - 1,
-            0
-          )} messages left today.`
+          `✅ Saved. You have ${Math.max(usage.remaining - 1, 0)} messages left today.`
         );
       } catch (e) {
         console.error(e);
@@ -220,9 +260,33 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
           <p className="mt-3 text-sm text-aura-500 text-center">{infoMsg}</p>
         )}
 
+        {/* ✅ Recording status */}
+        {isRecording && (
+          <p className="mt-2 text-xs text-red-500 text-center font-semibold">
+            🎙 Listening...
+          </p>
+        )}
+
         <div className="flex items-center justify-between mt-4">
+          {/* ✅ REAL MIC BUTTON */}
           <button
-            onClick={() => setIsRecording(!isRecording)}
+            onClick={() => {
+              const recognition = recognitionRef.current;
+
+              if (!recognition) {
+                alert("Mic is not supported on this browser 😢 Try Chrome desktop.");
+                return;
+              }
+
+              if (!isRecording) {
+                setInfoMsg("");
+                setIsRecording(true);
+                recognition.start(); // ✅ permission popup happens here
+              } else {
+                setIsRecording(false);
+                recognition.stop();
+              }
+            }}
             className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
               isRecording
                 ? "bg-red-400 animate-pulse text-white"
