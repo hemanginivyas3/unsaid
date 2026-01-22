@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://unsaid-seven.vercel.app/sitemap.xml
