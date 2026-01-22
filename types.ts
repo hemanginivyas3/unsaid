@@ -21,6 +21,8 @@ export interface Entry {
   type: 'vent' | 'letter' | 'reflection' | 'chat';
   emotions?: EmotionType[];
   isSilent?: boolean;
+  isPinned?: boolean;
+  isFavorite?: boolean;
 }
 
 export interface UserProfile {
