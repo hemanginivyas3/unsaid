@@ -21,15 +21,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
     if (!GEMINI_API_KEY) {
-      return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
+      return res.status(500).json({ error: "GEMINI_API_KEY missing in Vercel env" });
     }
 
-    // ✅ System instruction to reduce repetition
-    const systemInstruction =
-      "You are Unsaid, a gentle, warm, human-like companion. Be empathetic, natural, and concise. Avoid repeating the same lines. Ask gentle follow-up questions when helpful.";
+    // ✅ System instruction to avoid repetition & be helpful
+    const systemInstruction = `
+You are Unsaid, a calm, warm, human-like emotional support companion.
+Rules:
+- DO NOT repeat the same line again and again.
+- Give helpful, personalized responses.
+- Ask 1 gentle question at the end (not always "tell me more").
+- Keep responses under 80 words.
+- No bullet points.
+`;
 
-    // ✅ Convert chat history into Gemini format
+    // ✅ Convert history into Gemini format
     const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
 
     const contents = [
@@ -48,17 +56,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ];
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents,
           generationConfig: {
             temperature: 0.9,
-            maxOutputTokens: 200,
+            maxOutputTokens: 180,
           },
         }),
       }
@@ -66,13 +72,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const data = await response.json();
 
-    const aiText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "I’m here with you. Tell me more.";
+    // ✅ If Gemini fails, show error in logs
+    if (!response.ok) {
+      console.log("❌ Gemini API error status:", response.status);
+      console.log("❌ Gemini API error body:", JSON.stringify(data));
+      return res.status(500).json({
+        error: "Gemini API error",
+        details: data,
+      });
+    }
+
+    let aiText =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
+      "I’m here with you 💙 What happened exactly?";
+
+    // ✅ Safety: avoid repeating same generic text
+    if (aiText.toLowerCase().includes("tell me more")) {
+      aiText =
+        "That sounds painful 💙 Rejection can hit really hard. Do you want comfort right now, or do you want practical advice on what to do next?";
+    }
 
     return res.status(200).json({ reply: aiText });
   } catch (error) {
-    console.error(error);
+    console.error("api/gemini.ts error:", error);
     return res.status(500).json({ error: "Something went wrong" });
   }
 }
