@@ -49,15 +49,20 @@ const Chat: React.FC = () => {
 
     const userMsg = input.trim();
     setInput("");
+
+    // ✅ Add user message to UI
     setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
     setIsLoading(true);
 
     try {
-      // ✅ Call backend (safe)
+      // ✅ Call backend (safe) + send history to avoid repetition
       const res = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: userMsg }),
+        body: JSON.stringify({
+          text: userMsg,
+          history: messages.slice(-10), // ✅ last 10 messages only
+        }),
       });
 
       const data = await res.json();
@@ -113,9 +118,7 @@ const Chat: React.FC = () => {
 
       <div className="p-4 bg-aura-50/50 border-t border-aura-100">
         {/* ✅ info message */}
-        {infoMsg && (
-          <p className="text-center text-sm text-aura-500 mb-2">{infoMsg}</p>
-        )}
+        {infoMsg && <p className="text-center text-sm text-aura-500 mb-2">{infoMsg}</p>}
 
         <div className="flex gap-2 bg-white rounded-2xl border border-aura-200 p-2 focus-within:ring-2 ring-aura-200 transition-all">
           <input
