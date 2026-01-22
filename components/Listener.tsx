@@ -16,14 +16,12 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
   const [response, setResponse] = useState<string | null>(null);
 
   const [isTyping, setIsTyping] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
 
-  // ✅ Speech recognition ref
+  // ✅ Mic
+  const [isRecording, setIsRecording] = useState(false);
   const recognitionRef = useRef<any>(null);
 
-  const [mode, setMode] = useState<"listen-respond" | "just-listen">(
-    "listen-respond"
-  );
+  const [mode, setMode] = useState<"listen-respond" | "just-listen">("listen-respond");
 
   const [showEmotions, setShowEmotions] = useState(false);
   const [selectedEmotions, setSelectedEmotions] = useState<EmotionType[]>([]);
@@ -35,40 +33,36 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // ✅ Focus cursor in textarea
   useEffect(() => {
     if (textareaRef.current) textareaRef.current.focus();
   }, []);
 
-  // ✅ REAL MIC SETUP (this triggers permission popup on start)
+  // ✅ Setup Speech Recognition once
   useEffect(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      console.warn("SpeechRecognition not supported in this browser");
+      console.warn("SpeechRecognition not supported in this browser.");
       return;
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
     recognition.lang = "en-IN";
+    recognition.interimResults = true;
+    recognition.continuous = true;
 
     recognition.onresult = (event: any) => {
-      let newText = "";
-
+      let transcript = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        newText += transcript;
+        transcript += event.results[i][0].transcript;
       }
-
-      setText((prev) => (prev ? prev + " " + newText : newText));
+      setText(transcript);
     };
 
     recognition.onerror = (event: any) => {
-      console.error("Mic error:", event.error);
-      setInfoMsg("❌ Mic error. Please allow microphone permission.");
+      console.error("Mic error:", event);
+      setInfoMsg("⚠️ Microphone error. Please allow mic permission in browser settings.");
       setIsRecording(false);
     };
 
@@ -81,35 +75,61 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
 
   const toggleEmotion = (emotion: EmotionType) => {
     setSelectedEmotions((prev) =>
-      prev.includes(emotion)
-        ? prev.filter((e) => e !== emotion)
-        : [...prev, emotion]
+      prev.includes(emotion) ? prev.filter((e) => e !== emotion) : [...prev, emotion]
     );
+  };
+
+  const toggleMic = async () => {
+    if (!recognitionRef.current) {
+      setInfoMsg("⚠️ Your browser does not support mic input. Use Chrome.");
+      return;
+    }
+
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+      return;
+    }
+
+    try {
+      // ✅ force permission request
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      setInfoMsg("");
+      recognitionRef.current.start();
+      setIsRecording(true);
+    } catch (e) {
+      console.error(e);
+      setInfoMsg("⚠️ Mic permission blocked. Please allow mic in Chrome settings.");
+      setIsRecording(false);
+    }
   };
 
   const handleFinish = async () => {
     if (!text.trim()) return;
 
-    // ✅ Prevent double clicks / spamming
     if (loading) return;
 
-    // ✅ Cooldown (rate limit)
     if (cooldown) {
       setInfoMsg("Please wait a few seconds before sending again 🙂");
       return;
     }
 
     setCooldown(true);
-    setTimeout(() => setCooldown(false), 8000); // 8 sec cooldown
+    setTimeout(() => setCooldown(false), 8000);
 
     const uid = auth.currentUser?.uid;
-
     if (!uid) {
       setInfoMsg("Please login again.");
       return;
     }
 
-    // ✅ If user wants AI response → apply daily limit
+    // stop mic if running
+    if (isRecording && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    }
+
     if (mode === "listen-respond") {
       const usage = await canUseGemini(uid);
 
@@ -124,10 +144,8 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
 
         const res = await getEmpatheticResponse(text);
 
-        // ✅ Count usage only after successful AI reply
         await incrementGeminiUsage(uid);
 
-        // ✅ Save to Firestore
         await saveEmotionEntry({
           userId: uid,
           userText: text,
@@ -137,9 +155,7 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
         setResponse(res);
         setShowEmotions(true);
 
-        setInfoMsg(
-          `✅ Saved. You have ${Math.max(usage.remaining - 1, 0)} messages left today.`
-        );
+        setInfoMsg(`✅ Saved. You have ${Math.max(usage.remaining - 1, 0)} messages left today.`);
       } catch (e) {
         console.error(e);
         setInfoMsg("❌ Something went wrong. Please try again.");
@@ -148,7 +164,6 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
         setIsTyping(false);
       }
     } else {
-      // ✅ Vent mode: no AI call, no daily usage count
       setResponse("Thank you for sharing that with me. Your words are safe.");
       setShowEmotions(true);
       setInfoMsg("");
@@ -169,9 +184,7 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
         )}
 
         <div className="text-center space-y-6">
-          <p className="text-aura-800 font-serif text-lg">
-            Label your feelings to release them.
-          </p>
+          <p className="text-aura-800 font-serif text-lg">Label your feelings to release them.</p>
 
           <div className="flex flex-wrap justify-center gap-2">
             {Object.values(EmotionType).map((emotion) => (
@@ -192,11 +205,7 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
           <div className="pt-6 flex flex-col gap-3">
             <button
               onClick={() => {
-                onSave({
-                  content: text,
-                  type: "reflection",
-                  emotions: selectedEmotions,
-                });
+                onSave({ content: text, type: "reflection", emotions: selectedEmotions });
                 onClose();
               }}
               className="px-10 py-4 bg-aura-800 text-white rounded-2xl font-bold shadow-lg"
@@ -217,9 +226,7 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
   return (
     <div className="flex-1 flex flex-col fade-in">
       <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-serif text-aura-900 italic">
-          Deep Reflection
-        </h2>
+        <h2 className="text-3xl font-serif text-aura-900 italic">Deep Reflection</h2>
 
         <div className="flex bg-aura-100/50 p-1 rounded-xl">
           <button
@@ -236,9 +243,7 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
           <button
             onClick={() => setMode("just-listen")}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              mode === "just-listen"
-                ? "bg-white text-aura-800 shadow-sm"
-                : "text-aura-400"
+              mode === "just-listen" ? "bg-white text-aura-800 shadow-sm" : "text-aura-400"
             }`}
           >
             Vent
@@ -255,50 +260,18 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
           className="w-full flex-1 bg-transparent text-xl text-aura-900 placeholder-aura-200 focus:outline-none resize-none font-serif leading-relaxed"
         />
 
-        {/* ✅ Info message */}
-        {infoMsg && (
-          <p className="mt-3 text-sm text-aura-500 text-center">{infoMsg}</p>
-        )}
-
-        {/* ✅ Recording status */}
-        {isRecording && (
-          <p className="mt-2 text-xs text-red-500 text-center font-semibold">
-            🎙 Listening...
-          </p>
-        )}
+        {infoMsg && <p className="mt-3 text-sm text-aura-500 text-center">{infoMsg}</p>}
 
         <div className="flex items-center justify-between mt-4">
-          {/* ✅ REAL MIC BUTTON */}
           <button
-            onClick={() => {
-              const recognition = recognitionRef.current;
-
-              if (!recognition) {
-                alert("Mic is not supported on this browser 😢 Try Chrome desktop.");
-                return;
-              }
-
-              if (!isRecording) {
-                setInfoMsg("");
-                setIsRecording(true);
-                recognition.start(); // ✅ permission popup happens here
-              } else {
-                setIsRecording(false);
-                recognition.stop();
-              }
-            }}
+            onClick={toggleMic}
             className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
               isRecording
                 ? "bg-red-400 animate-pulse text-white"
                 : "bg-aura-50 text-aura-400 hover:text-aura-600"
             }`}
           >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
