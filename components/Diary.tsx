@@ -1,65 +1,204 @@
-
-import React from 'react';
-import { Entry } from '../types';
+import React, { useMemo, useState } from "react";
+import { Entry } from "../types";
 
 interface DiaryProps {
   entries: Entry[];
 }
 
 const Diary: React.FC<DiaryProps> = ({ entries }) => {
-  const sortedEntries = [...entries].sort((a, b) => b.timestamp - a.timestamp);
+  const [query, setQuery] = useState("");
 
-  if (sortedEntries.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col justify-center items-center text-center fade-in py-20">
-        <div className="w-20 h-20 bg-aura-50 rounded-[2rem] flex items-center justify-center mb-6">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-aura-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-        </div>
-        <h2 className="text-2xl font-serif text-aura-800 mb-2 italic">A quiet beginning</h2>
-        <p className="text-aura-400 max-w-xs leading-relaxed">Your future reflections will be safely stored here for when you wish to revisit them.</p>
-      </div>
-    );
-  }
+  // ✅ Helper: format day key (YYYY-MM-DD)
+  const getDayKey = (ts: number) => {
+    const d = new Date(ts);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // ✅ Search filter (basic)
+  const filteredEntries = useMemo(() => {
+    if (!query.trim()) return entries;
+    const q = query.toLowerCase();
+    return entries.filter((e) => e.content.toLowerCase().includes(q));
+  }, [entries, query]);
+
+  // ✅ Stats
+  const totalEntries = entries.length;
+
+  const todayKey = getDayKey(Date.now());
+  const todayEntriesCount = entries.filter(
+    (e) => getDayKey(e.timestamp) === todayKey
+  ).length;
+
+  // ✅ Streak calculation
+  const streak = useMemo(() => {
+    if (entries.length === 0) return 0;
+
+    const daySet = new Set(entries.map((e) => getDayKey(e.timestamp)));
+
+    let s = 0;
+    let cursor = new Date();
+    while (true) {
+      const key = getDayKey(cursor.getTime());
+      if (daySet.has(key)) {
+        s++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    return s;
+  }, [entries]);
+
+  // ✅ Emotion chart
+  const emotionStats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    entries.forEach((e) => {
+      if (e.emotions && e.emotions.length > 0) {
+        e.emotions.forEach((em) => {
+          counts[em] = (counts[em] || 0) + 1;
+        });
+      }
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [entries]);
+
+  const maxEmotionCount =
+    emotionStats.length > 0 ? emotionStats[0][1] : 1;
 
   return (
-    <div className="flex-1 fade-in">
-      <h2 className="text-3xl font-serif text-aura-800 mb-10 italic">Past Reflections</h2>
-      <div className="space-y-10">
-        {sortedEntries.map((entry) => (
-          <div key={entry.id} className="group">
-            <div className="flex items-start gap-6">
-              <div className="pt-2 text-aura-200 text-xs font-bold uppercase tracking-[0.2em] whitespace-nowrap w-24">
-                {new Date(entry.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              </div>
-              <div className="flex-1 bg-white p-8 rounded-[2rem] border border-aura-50 group-hover:border-aura-200 transition-all shadow-sm hover:shadow-md">
-                <div className="flex justify-between items-start mb-4">
-                  <span className={`px-3 py-1 rounded-lg text-[10px] uppercase font-bold tracking-widest ${
-                    entry.type === 'letter' ? 'bg-amber-50 text-amber-700' : 'bg-aura-50 text-aura-700'
-                  }`}>
-                    {entry.type}
-                  </span>
-                  <span className="text-xs text-aura-200 font-medium">
-                    {new Date(entry.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-                <p className="text-aura-900 font-serif leading-relaxed text-lg line-clamp-4 group-hover:line-clamp-none transition-all duration-500 whitespace-pre-wrap">
-                  {entry.content}
-                </p>
-                {entry.emotions && entry.emotions.length > 0 && (
-                  <div className="mt-6 flex flex-wrap gap-2">
-                    {entry.emotions.map(emotion => (
-                      <span key={emotion} className="text-[10px] bg-aura-50 text-aura-600 px-3 py-1 rounded-full border border-aura-100 font-medium">
-                        {emotion}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+    <div className="space-y-8 fade-in">
+      {/* ✅ Dashboard Card */}
+      <div className="bg-white rounded-[2.5rem] p-8 border border-aura-100 shadow-sm">
+        <h2 className="text-2xl font-serif text-aura-900 italic">
+          Your Diary
+        </h2>
+        <p className="text-aura-400 text-sm mt-1">
+          A calm record of your thoughts, feelings, and wins.
+        </p>
+
+        <div className="grid grid-cols-3 gap-3 mt-6">
+          <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
+            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
+              Total Entries
+            </p>
+            <p className="text-2xl font-serif text-aura-900 mt-1">
+              {totalEntries}
+            </p>
           </div>
-        ))}
+
+          <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
+            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
+              Today
+            </p>
+            <p className="text-2xl font-serif text-aura-900 mt-1">
+              {todayEntriesCount}
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
+            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
+              Streak
+            </p>
+            <p className="text-2xl font-serif text-aura-900 mt-1">
+              {streak} 🔥
+            </p>
+          </div>
+        </div>
+
+        {/* ✅ Mood chart */}
+        <div className="mt-7">
+          <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest mb-3">
+            Mood Map
+          </p>
+
+          {emotionStats.length === 0 ? (
+            <p className="text-aura-400 text-sm">
+              No emotion tags yet. Save a reflection with emotions 💙
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {emotionStats.slice(0, 6).map(([emotion, count]) => {
+                const width = Math.round((count / maxEmotionCount) * 100);
+                return (
+                  <div key={emotion}>
+                    <div className="flex justify-between text-xs text-aura-600 font-bold mb-1">
+                      <span>{emotion}</span>
+                      <span>{count}</span>
+                    </div>
+                    <div className="w-full h-3 bg-aura-50 border border-aura-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-aura-600 rounded-full transition-all"
+                        style={{ width: `${width}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ✅ Search */}
+      <div className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm">
+        <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest mb-3">
+          Search
+        </p>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search inside your diary..."
+          className="w-full px-4 py-3 rounded-2xl border border-aura-200 outline-none font-serif text-aura-900 bg-aura-50/30 focus:ring-2 ring-aura-200"
+        />
+      </div>
+
+      {/* ✅ Entries */}
+      <div className="space-y-4">
+        <h3 className="text-xl font-serif italic text-aura-900">
+          Your Entries
+        </h3>
+
+        {filteredEntries.length === 0 ? (
+          <div className="bg-white rounded-[2.5rem] p-8 border border-aura-100 shadow-sm text-aura-400 text-sm">
+            No entries found.
+          </div>
+        ) : (
+          filteredEntries.map((entry) => (
+            <div
+              key={entry.id}
+              className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm"
+            >
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-aura-400">
+                  {entry.type}
+                </span>
+                <span className="text-[10px] text-aura-300 font-bold">
+                  {new Date(entry.timestamp).toLocaleString()}
+                </span>
+              </div>
+
+              <p className="text-aura-900 font-serif text-lg leading-relaxed whitespace-pre-wrap">
+                {entry.content}
+              </p>
+
+              {entry.emotions && entry.emotions.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {entry.emotions.map((em) => (
+                    <span
+                      key={em}
+                      className="px-3 py-1 rounded-full text-[10px] font-bold bg-aura-50 text-aura-700 border border-aura-100"
+                    >
+                      {em}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
