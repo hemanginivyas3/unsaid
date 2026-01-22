@@ -18,12 +18,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
-    // ✅ THIS IS THE MAIN FIX
-    // Use v1beta endpoint + valid model
-    const MODEL = "gemini-1.5-flash";
+    // ✅ USE A MODEL THAT YOUR KEY ACTUALLY SUPPORTS
+    const MODEL = "gemini-2.0-flash";
 
-    const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
     const response = await fetch(url, {
       method: "POST",
