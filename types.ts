@@ -23,6 +23,8 @@ export interface Entry {
   isSilent?: boolean;
   isPinned?: boolean;
   isFavorite?: boolean;
+  audioId?: string;
+
 }
 
 export interface UserProfile {

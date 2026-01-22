@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Entry } from "../types";
+import { getAudioBlob } from "../audioStore";
 
 interface DiaryProps {
   entries: Entry[];
@@ -32,6 +33,17 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
     const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   };
+const playVoiceNote = async (audioId: string) => {
+  const blob = await getAudioBlob(audioId);
+  if (!blob) {
+    alert("Audio not found 😢");
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.play();
+};
 
   // ✅ Stats
   const totalEntries = entries.length;
@@ -410,6 +422,14 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
                   ))}
                 </div>
               )}
+{entry.audioId && (
+  <button
+    onClick={() => playVoiceNote(entry.audioId!)}
+    className="mt-4 w-full py-3 rounded-2xl bg-aura-50 border border-aura-100 text-aura-700 font-bold text-sm hover:bg-aura-100 transition-all"
+  >
+    🎧 Play Voice Note
+  </button>
+)}
 
               {/* ✅ Actions */}
               <div className="grid grid-cols-3 gap-2 mt-5">

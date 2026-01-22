@@ -4,17 +4,14 @@ import { db } from "./firebase";
 export async function saveEmotionEntry(entry: {
   userId: string;
   userText: string;
-  emotions?: string[];
-  type?: "reflection" | "vent";
+  aiReply?: string; // ✅ OPTIONAL now
 }) {
   const ref = collection(db, "emotions");
 
   return await addDoc(ref, {
     userId: entry.userId,
     userText: entry.userText,
-    emotions: entry.emotions || [],
-    type: entry.type || "reflection",
-    createdAt: serverTimestamp(), // ✅ time sorting
+    aiReply: entry.aiReply || "", // ✅ safe default
+    createdAt: serverTimestamp(),
   });
 }
-

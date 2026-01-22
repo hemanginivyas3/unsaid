@@ -1,18 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { EmotionType, Entry } from "../types";
-import { saveEmotionEntry } from "../firestoreService";
 import { auth } from "../firebase";
+import { saveEmotionEntry } from "../firestoreService";
+import { saveAudioBlob } from "../audioStore";
 
 interface ListenerProps {
   onSave: (entry: Partial<Entry>) => void;
   onClose: () => void;
-}
-
-declare global {
-  interface Window {
-    webkitSpeechRecognition: any;
-    SpeechRecognition: any;
-  }
 }
 
 const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
@@ -21,95 +15,22 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
   const [selectedEmotions, setSelectedEmotions] = useState<EmotionType[]>([]);
   const [mode, setMode] = useState<"reflection" | "vent">("reflection");
 
-  // ✅ mic states
-  const [isRecording, setIsRecording] = useState(false);
-  const recognitionRef = useRef<any>(null);
-
   // ✅ UI message
   const [infoMsg, setInfoMsg] = useState("");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // ✅ Audio recorder states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedAudioId, setRecordedAudioId] = useState<string | null>(null);
+  const [recordedAudioURL, setRecordedAudioURL] = useState<string | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+
   useEffect(() => {
     if (textareaRef.current) textareaRef.current.focus();
   }, []);
-
-  // ✅ Setup Speech Recognition once
-  useEffect(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setInfoMsg("🎙️ Voice typing not supported on this browser (try Chrome).");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-IN";
-
-    recognition.onresult = (event: any) => {
-      let finalTranscript = "";
-      let interimTranscript = "";
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript + " ";
-        } else {
-          interimTranscript += transcript;
-        }
-      }
-
-      // ✅ Update text smoothly
-      setText((prev) => prev + finalTranscript);
-
-      // ✅ show interim (optional)
-      if (interimTranscript.trim()) {
-        setInfoMsg("🎙️ Listening...");
-      }
-    };
-
-    recognition.onerror = (e: any) => {
-      console.error("Mic error:", e);
-      setInfoMsg("❌ Mic issue. Please allow microphone permission.");
-      setIsRecording(false);
-    };
-
-    recognition.onend = () => {
-      setIsRecording(false);
-      setInfoMsg("");
-    };
-
-    recognitionRef.current = recognition;
-  }, []);
-
-  const toggleRecording = async () => {
-    try {
-      // ✅ trigger mic permission prompt
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      if (!recognitionRef.current) {
-        setInfoMsg("🎙️ Voice typing not supported.");
-        return;
-      }
-
-      if (isRecording) {
-        recognitionRef.current.stop();
-        setIsRecording(false);
-        setInfoMsg("");
-      } else {
-        recognitionRef.current.start();
-        setIsRecording(true);
-        setInfoMsg("🎙️ Listening...");
-      }
-    } catch (err) {
-      console.error(err);
-      setInfoMsg("❌ Please allow microphone access in browser settings.");
-    }
-  };
 
   const toggleEmotion = (emotion: EmotionType) => {
     setSelectedEmotions((prev) =>
@@ -119,27 +40,72 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
     );
   };
 
+  // ✅ Start/Stop REAL Audio Recording
+  const toggleRecording = async () => {
+    try {
+      if (isRecording) {
+        mediaRecorderRef.current?.stop();
+        setIsRecording(false);
+        return;
+      }
+
+      // ✅ Ask mic permission
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        // stop mic stream
+        stream.getTracks().forEach((t) => t.stop());
+
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+
+        // ✅ create local playback URL
+        const url = URL.createObjectURL(blob);
+        setRecordedAudioURL(url);
+
+        // ✅ Save blob in IndexedDB
+        const audioId = "audio-" + Date.now();
+        await saveAudioBlob(audioId, blob);
+        setRecordedAudioId(audioId);
+
+        setInfoMsg("✅ Voice note saved! You can still write too.");
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setInfoMsg("🎙️ Recording... tap again to stop.");
+    } catch (err) {
+      console.error(err);
+      setInfoMsg("❌ Please allow microphone permission in your browser.");
+    }
+  };
+
   const handleFinish = async () => {
-    if (!text.trim()) {
-      setInfoMsg("Write or speak something first 🙂");
+    if (!text.trim() && !recordedAudioId) {
+      setInfoMsg("Write something or record a voice note first 🙂");
       return;
     }
 
     const uid = auth.currentUser?.uid;
-
     if (!uid) {
       setInfoMsg("Please login again.");
       return;
     }
 
     try {
+      // ✅ Save in Firestore (optional)
       await saveEmotionEntry({
-       userId: uid,
-       userText: text,
-       type: mode === "reflection" ? "reflection" : "vent",
-       emotions: selectedEmotions,
+        userId: uid,
+        userText: text || "(Voice Note)",
+        aiReply: "",
       });
-
 
       setShowEmotions(true);
       setInfoMsg("");
@@ -178,10 +144,12 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
             <button
               onClick={() => {
                 onSave({
-                  content: text,
+                  content: text || "(Voice Note)",
                   type: mode === "reflection" ? "reflection" : "vent",
                   emotions: selectedEmotions,
+                  audioId: recordedAudioId || undefined,
                 });
+
                 onClose();
               }}
               className="px-10 py-4 bg-aura-800 text-white rounded-2xl font-bold shadow-lg"
@@ -244,6 +212,18 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
           <p className="mt-3 text-sm text-aura-500 text-center">{infoMsg}</p>
         )}
 
+        {/* ✅ audio preview */}
+        {recordedAudioURL && (
+          <div className="mt-4 p-4 rounded-2xl bg-aura-50 border border-aura-100">
+            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest mb-2">
+              Voice Note Preview
+            </p>
+            <audio controls className="w-full">
+              <source src={recordedAudioURL} type="audio/webm" />
+            </audio>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mt-4">
           <button
             onClick={toggleRecording}
@@ -270,7 +250,6 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
 
           <button
             onClick={handleFinish}
-            disabled={!text.trim()}
             className="px-8 py-3 bg-aura-800 text-white rounded-2xl font-bold shadow-lg disabled:opacity-30"
           >
             Finish
