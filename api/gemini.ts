@@ -1,9 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-type HistoryMsg = {
-  role: "user" | "model";
-  text: string;
-};
+type HistoryMsg = { role: "user" | "model"; text: string };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -21,39 +18,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
     if (!GEMINI_API_KEY) {
-      return res.status(500).json({ error: "GEMINI_API_KEY missing in Vercel env" });
+      return res.status(500).json({ error: "GEMINI_API_KEY missing" });
     }
 
-    // ✅ System instruction to avoid repetition & be helpful
+    // ✅ Strong system prompt
     const systemInstruction = `
-You are Unsaid, a calm, warm, human-like emotional support companion.
+You are Unsaid — a calm, kind, human-like companion.
+Your job is to reply like a real supportive friend.
 Rules:
-- DO NOT repeat the same line again and again.
-- Give helpful, personalized responses.
-- Ask 1 gentle question at the end (not always "tell me more").
-- Keep responses under 80 words.
-- No bullet points.
+- Never repeat the same sentence.
+- Avoid generic replies like "Tell me more" again and again.
+- Give short actionable help in 2-4 lines.
+- Ask 1 gentle follow-up question.
+- Keep it warm and natural.
 `;
 
-    // ✅ Convert history into Gemini format
-    const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
+    // ✅ Prepare safe short history
+    const safeHistory = Array.isArray(history) ? history.slice(-8) : [];
 
-    const contents = [
-      {
-        role: "user",
-        parts: [{ text: systemInstruction }],
-      },
-      ...safeHistory.map((m) => ({
-        role: m.role,
-        parts: [{ text: m.text }],
-      })),
-      {
-        role: "user",
-        parts: [{ text }],
-      },
-    ];
+    // ✅ Build conversation as ONE prompt string (most reliable)
+    const historyText = safeHistory
+      .map((m) => `${m.role === "user" ? "User" : "Unsaid"}: ${m.text}`)
+      .join("\n");
+
+    const prompt = `${systemInstruction}\n\n${historyText}\nUser: ${text}\nUnsaid:`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -61,10 +50,10 @@ Rules:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents,
+          contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.9,
-            maxOutputTokens: 180,
+            maxOutputTokens: 200,
           },
         }),
       }
@@ -72,29 +61,29 @@ Rules:
 
     const data = await response.json();
 
-    // ✅ If Gemini fails, show error in logs
     if (!response.ok) {
-      console.log("❌ Gemini API error status:", response.status);
-      console.log("❌ Gemini API error body:", JSON.stringify(data));
-      return res.status(500).json({
-        error: "Gemini API error",
-        details: data,
-      });
+      console.log("❌ Gemini Status:", response.status);
+      console.log("❌ Gemini Body:", JSON.stringify(data));
+      return res.status(500).json({ error: "Gemini API error", details: data });
     }
 
-    let aiText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-      "I’m here with you 💙 What happened exactly?";
+    let aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
-    // ✅ Safety: avoid repeating same generic text
+    // ✅ Hard fallback (but NOT boring)
+    if (!aiText || aiText.length < 5) {
+      aiText =
+        "Okay 💙 If you’re bored, let’s fix it right now: want something relaxing, something productive, or something fun?";
+    }
+
+    // ✅ Never allow repeating tell-me-more
     if (aiText.toLowerCase().includes("tell me more")) {
       aiText =
-        "That sounds painful 💙 Rejection can hit really hard. Do you want comfort right now, or do you want practical advice on what to do next?";
+        "I got you 💙 If you’re bored, let’s pick one: 1) mini self-care reset 2) quick fun challenge 3) plan something useful. Which one?";
     }
 
     return res.status(200).json({ reply: aiText });
-  } catch (error) {
-    console.error("api/gemini.ts error:", error);
+  } catch (err) {
+    console.error("api/gemini error:", err);
     return res.status(500).json({ error: "Something went wrong" });
   }
 }
