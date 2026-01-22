@@ -21,7 +21,12 @@ const Layout: React.FC<LayoutProps> = ({
       label: "Home",
       view: "home",
       icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -36,7 +41,12 @@ const Layout: React.FC<LayoutProps> = ({
       label: "Diary",
       view: "diary",
       icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -47,27 +57,16 @@ const Layout: React.FC<LayoutProps> = ({
       ),
     },
 
-    // ✅ NEW: Journal
-    {
-      label: "Journal",
-      view: "journal",
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 6h12M8 10h12M8 14h12M6 6h.01M6 10h.01M6 14h.01M4 4h16a2 2 0 012 2v14a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z"
-          />
-        </svg>
-      ),
-    },
-
     {
       label: "Profile",
       view: "profile",
       icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -102,7 +101,7 @@ const Layout: React.FC<LayoutProps> = ({
         <main className="fade-in">{children}</main>
       </div>
 
-      {/* Bottom Floating Navigation */}
+      {/* ✅ Bottom Floating Navigation */}
       <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white/80 backdrop-blur-xl border border-white/50 shadow-2xl rounded-[2.5rem] px-6 py-3 flex justify-between items-center z-50">
         {navItems.map((item) => (
           <button
@@ -118,6 +117,7 @@ const Layout: React.FC<LayoutProps> = ({
             <span className="text-[10px] font-bold tracking-tighter">
               {item.label}
             </span>
+
             {activeView === item.view && (
               <div className="w-1 h-1 rounded-full bg-aura-600 mt-0.5" />
             )}

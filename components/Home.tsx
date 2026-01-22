@@ -19,7 +19,7 @@ const Home: React.FC<HomeProps> = ({ onViewChange }) => {
 
       {/* ✅ Main Action Card (changed from AI Chat to Journal) */}
       <button
-        onClick={() => onViewChange("journal")}
+        onClick={() => onViewChange("diary")}
         className="w-full bg-gradient-to-br from-aura-800 to-aura-900 p-8 rounded-[2.5rem] text-left shadow-2xl relative overflow-hidden group hover:scale-[1.01] transition-all"
       >
         <div className="relative z-10">
