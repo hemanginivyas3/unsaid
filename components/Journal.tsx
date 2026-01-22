@@ -1,21 +1,21 @@
 import React, { useEffect, useState } from "react";
 import { auth } from "../firebase";
-import { EmotionType } from "../types";
+import { db } from "../firebase";
 import {
   collection,
   query,
   where,
   orderBy,
   getDocs,
-  Timestamp,
 } from "firebase/firestore";
-import { db } from "../firebase";
 
 type JournalItem = {
   id: string;
+  userId: string;
   userText: string;
-  createdAt?: Timestamp;
-  emotions?: EmotionType[];
+  emotions?: string[];
+  type?: "reflection" | "vent";
+  createdAt?: any;
 };
 
 const Journal: React.FC = () => {
@@ -26,10 +26,13 @@ const Journal: React.FC = () => {
     const loadEntries = async () => {
       try {
         const uid = auth.currentUser?.uid;
-        if (!uid) return;
+        if (!uid) {
+          setLoading(false);
+          return;
+        }
 
         const q = query(
-          collection(db, "emotionEntries"),
+          collection(db, "emotions"), // ✅ THIS MATCHES YOUR FIRESTORE
           where("userId", "==", uid),
           orderBy("createdAt", "desc")
         );
@@ -61,7 +64,7 @@ const Journal: React.FC = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto w-full px-4">
+    <div className="max-w-2xl mx-auto w-full px-4 fade-in">
       <h2 className="text-3xl font-serif text-aura-900 italic mb-6">
         Your Journal
       </h2>
@@ -77,11 +80,25 @@ const Journal: React.FC = () => {
               key={item.id}
               className="p-6 bg-white rounded-[2rem] border border-aura-100 shadow-sm"
             >
-              <p className="text-aura-900 font-serif text-lg leading-relaxed">
-                {item.userText?.slice(0, 180)}
-                {item.userText?.length > 180 ? "..." : ""}
+              {/* type */}
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold uppercase tracking-widest text-aura-500">
+                  {item.type || "reflection"}
+                </span>
+
+                {item.createdAt?.toDate && (
+                  <span className="text-xs text-aura-400">
+                    {item.createdAt.toDate().toLocaleString()}
+                  </span>
+                )}
+              </div>
+
+              {/* text */}
+              <p className="text-aura-900 font-serif text-lg leading-relaxed whitespace-pre-wrap">
+                {item.userText}
               </p>
 
+              {/* emotions */}
               {item.emotions && item.emotions.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-4">
                   {item.emotions.map((e, idx) => (
@@ -93,12 +110,6 @@ const Journal: React.FC = () => {
                     </span>
                   ))}
                 </div>
-              )}
-
-              {item.createdAt && (
-                <p className="mt-3 text-xs text-aura-400">
-                  {item.createdAt.toDate().toLocaleString()}
-                </p>
               )}
             </div>
           ))}

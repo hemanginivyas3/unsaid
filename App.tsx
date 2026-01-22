@@ -1,3 +1,4 @@
+import Journal from "./components/Journal";
 import NameSetup from "./NameSetup";
 import { getUserProfile } from "./userService";
 import React, { useEffect, useState } from "react";
@@ -13,7 +14,6 @@ import Diary from "./components/Diary";
 import Letter from "./components/Letter";
 import Profile from "./components/Profile";
 
-
 import { ViewMode, Entry } from "./types";
 
 const App: React.FC = () => {
@@ -25,7 +25,6 @@ const App: React.FC = () => {
 
   const [userName, setUserName] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
-
 
   // ✅ ALWAYS runs (no conditional hooks)
   useEffect(() => {
@@ -42,25 +41,26 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-   const loadProfile = async () => {
-    if (!firebaseUser) return;
+    const loadProfile = async () => {
+      if (!firebaseUser) return;
 
-    setProfileLoading(true);
-    const profile = await getUserProfile(firebaseUser.uid);
+      setProfileLoading(true);
+      const profile = await getUserProfile(firebaseUser.uid);
 
-    setUserName(profile?.name || null);
-    setProfileLoading(false);
-  };
+      setUserName(profile?.name || null);
+      setProfileLoading(false);
+    };
 
-  loadProfile();
-}, [firebaseUser]);
-
+    loadProfile();
+  }, [firebaseUser]);
 
   // ✅ Load entries only after we know the user
   useEffect(() => {
     if (!firebaseUser) return;
 
-    const savedEntries = localStorage.getItem(`aura_entries_${firebaseUser.uid}`);
+    const savedEntries = localStorage.getItem(
+      `aura_entries_${firebaseUser.uid}`
+    );
     if (savedEntries) {
       try {
         setEntries(JSON.parse(savedEntries));
@@ -74,7 +74,10 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!firebaseUser) return;
 
-    localStorage.setItem(`aura_entries_${firebaseUser.uid}`, JSON.stringify(entries));
+    localStorage.setItem(
+      `aura_entries_${firebaseUser.uid}`,
+      JSON.stringify(entries)
+    );
   }, [entries, firebaseUser]);
 
   const handleLogout = async () => {
@@ -118,6 +121,10 @@ const App: React.FC = () => {
           />
         );
 
+      // ✅ NEW JOURNAL SCREEN
+      case "journal":
+        return <Journal />;
+
       case "profile":
         return (
           <Profile
@@ -130,8 +137,6 @@ const App: React.FC = () => {
             onLogout={handleLogout}
           />
         );
-
-
 
       default:
         return <Home onViewChange={setActiveView} />;
@@ -150,17 +155,16 @@ const App: React.FC = () => {
 
   if (profileLoading) {
     return <div style={{ padding: 20 }}>Loading profile...</div>;
-}
+  }
 
-if (!userName) {
-  return (
-    <NameSetup
-      uid={firebaseUser.uid}
-      onDone={(name) => setUserName(name)}
-    />
-  );
-}
-
+  if (!userName) {
+    return (
+      <NameSetup
+        uid={firebaseUser.uid}
+        onDone={(name) => setUserName(name)}
+      />
+    );
+  }
 
   // ✅ If logged in → show full app
   return (
@@ -175,4 +179,3 @@ if (!userName) {
 };
 
 export default App;
-
