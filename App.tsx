@@ -97,6 +97,9 @@ const App: React.FC = () => {
 
     setEntries((prev) => [entry, ...prev]);
   };
+const deleteEntryById = (id: string) => {
+  setEntries((prev) => prev.filter((e) => e.id !== id));
+};
 
   const renderContent = () => {
     switch (activeView) {
@@ -119,8 +122,10 @@ const App: React.FC = () => {
     <Diary
       entries={entries}
       onUpdateEntries={setEntries}
+      onDeleteEntry={deleteEntryById}
     />
   );
+
 
       case "letter":
         return (
