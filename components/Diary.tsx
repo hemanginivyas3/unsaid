@@ -25,6 +25,10 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
   const [undoEntry, setUndoEntry] = useState<Entry | null>(null);
   const [undoTimer, setUndoTimer] = useState<any>(null);
 
+  // ✅ Voice note UI states (Play/Pause controls)
+  const [openAudioId, setOpenAudioId] = useState<string | null>(null);
+  const [openAudioUrl, setOpenAudioUrl] = useState<string | null>(null);
+
   // ✅ Helper: day key
   const getDayKey = (ts: number) => {
     const d = new Date(ts);
@@ -33,24 +37,36 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
     const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   };
-const playVoiceNote = async (audioId: string) => {
-  const blob = await getAudioBlob(audioId);
-  if (!blob) {
-    alert("Audio not found 😢");
-    return;
-  }
 
-  const url = URL.createObjectURL(blob);
-  const audio = new Audio(url);
-  audio.play();
-};
+  // ✅ Open/Close voice note (with pause/play controls)
+  const openVoiceNote = async (audioId: string) => {
+    try {
+      // if same audio is open → close
+      if (openAudioId === audioId) {
+        setOpenAudioId(null);
+        setOpenAudioUrl(null);
+        return;
+      }
+
+      const blob = await getAudioBlob(audioId);
+      if (!blob) {
+        alert("Audio not found 😢");
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      setOpenAudioId(audioId);
+      setOpenAudioUrl(url);
+    } catch (err) {
+      console.error(err);
+      alert("Could not open voice note 😢");
+    }
+  };
 
   // ✅ Stats
   const totalEntries = entries.length;
   const todayKey = getDayKey(Date.now());
-  const todayEntriesCount = entries.filter(
-    (e) => getDayKey(e.timestamp) === todayKey
-  ).length;
+  const todayEntriesCount = entries.filter((e) => getDayKey(e.timestamp) === todayKey).length;
 
   // ✅ Streak
   const streak = useMemo(() => {
@@ -152,8 +168,7 @@ const playVoiceNote = async (audioId: string) => {
     const txt = sorted
       .map((e) => {
         const date = new Date(e.timestamp).toLocaleString();
-        const emotions =
-          e.emotions && e.emotions.length > 0 ? e.emotions.join(", ") : "None";
+        const emotions = e.emotions && e.emotions.length > 0 ? e.emotions.join(", ") : "None";
         return `TYPE: ${e.type}\nDATE: ${date}\nEMOTIONS: ${emotions}\n\n${e.content}\n\n------------------------------\n`;
       })
       .join("\n");
@@ -172,7 +187,6 @@ const playVoiceNote = async (audioId: string) => {
   // ✅ Delete + Undo
   const deleteWithUndo = (entry: Entry) => {
     onDeleteEntry(entry.id);
-
     setUndoEntry(entry);
 
     if (undoTimer) clearTimeout(undoTimer);
@@ -198,9 +212,7 @@ const playVoiceNote = async (audioId: string) => {
       {/* ✅ Undo bar */}
       {undoEntry && (
         <div className="bg-aura-800 text-white rounded-[2.5rem] px-6 py-4 shadow-2xl flex items-center justify-between">
-          <p className="font-bold text-sm">
-            ✅ Entry deleted. Undo?
-          </p>
+          <p className="font-bold text-sm">✅ Entry deleted. Undo?</p>
           <button
             onClick={handleUndo}
             className="px-5 py-2 rounded-2xl bg-white text-aura-800 font-bold text-sm hover:bg-aura-50 transition-all"
@@ -219,21 +231,15 @@ const playVoiceNote = async (audioId: string) => {
 
         <div className="grid grid-cols-3 gap-3 mt-6">
           <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
-            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
-              Total
-            </p>
+            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">Total</p>
             <p className="text-2xl font-serif text-aura-900 mt-1">{totalEntries}</p>
           </div>
           <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
-            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
-              Today
-            </p>
+            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">Today</p>
             <p className="text-2xl font-serif text-aura-900 mt-1">{todayEntriesCount}</p>
           </div>
           <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
-            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
-              Streak
-            </p>
+            <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">Streak</p>
             <p className="text-2xl font-serif text-aura-900 mt-1">{streak} 🔥</p>
           </div>
         </div>
@@ -422,14 +428,31 @@ const playVoiceNote = async (audioId: string) => {
                   ))}
                 </div>
               )}
-{entry.audioId && (
-  <button
-    onClick={() => playVoiceNote(entry.audioId!)}
-    className="mt-4 w-full py-3 rounded-2xl bg-aura-50 border border-aura-100 text-aura-700 font-bold text-sm hover:bg-aura-100 transition-all"
-  >
-    🎧 Play Voice Note
-  </button>
-)}
+
+              {/* ✅ Voice Note Section (Aesthetic + Play/Pause controls) */}
+              {entry.audioId && (
+                <div className="mt-4 space-y-3">
+                  <button
+                    onClick={() => openVoiceNote(entry.audioId!)}
+                    className="w-full py-3 rounded-2xl bg-aura-50 border border-aura-100 text-aura-700 font-bold text-sm hover:bg-aura-100 transition-all"
+                  >
+                    {openAudioId === entry.audioId
+                      ? "✖ Close Voice Note"
+                      : "🎧 Open Voice Note"}
+                  </button>
+
+                  {openAudioId === entry.audioId && openAudioUrl && (
+                    <div className="p-4 rounded-2xl bg-aura-50/60 border border-aura-100">
+                      <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest mb-2">
+                        Voice Note
+                      </p>
+                      <audio controls className="w-full">
+                        <source src={openAudioUrl} type="audio/webm" />
+                      </audio>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* ✅ Actions */}
               <div className="grid grid-cols-3 gap-2 mt-5">
