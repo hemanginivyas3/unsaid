@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { UserProfile } from '../types';
 
@@ -39,13 +38,20 @@ const Profile: React.FC<ProfileProps> = ({ user, onLogout }) => {
         <p className="text-aura-500 text-sm leading-relaxed">
           Your data is stored locally on this device. We use the Gemini API to provide a listening ear, but we never share your identity. Unsaid is a tool for self-reflection and emotional clarity.
         </p>
+
+        {/* ✅ Made by line */}
+        <p className="mt-6 text-center text-[11px] text-aura-300 font-serif italic tracking-wide">
+          Made by Hemangini Vyas ✨
+        </p>
       </div>
 
       <button
         onClick={onLogout}
         className="w-full py-4 border-2 border-aura-100 rounded-2xl text-red-400 font-bold hover:bg-red-50 hover:border-red-100 transition-all flex items-center justify-center gap-2"
       >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
         Sign Out & Lock Vault
       </button>
     </div>
