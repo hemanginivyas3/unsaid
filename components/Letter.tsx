@@ -7,6 +7,7 @@ interface LetterProps {
 }
 
 const Letter: React.FC<LetterProps> = ({ onSave, onClose }) => {
+  const [to, setTo] = useState(""); // ✅ NEW
   const [text, setText] = useState("");
   const [burning, setBurning] = useState(false);
   const [burnDone, setBurnDone] = useState(false);
@@ -20,8 +21,10 @@ const Letter: React.FC<LetterProps> = ({ onSave, onClose }) => {
   const handleSaveLetter = () => {
     if (!text.trim()) return;
 
+    const formattedLetter = `To: ${to.trim() || "Someone"}\n\n${text}`;
+
     onSave({
-      content: text,
+      content: formattedLetter,
       type: "letter",
       emotions: [],
     });
@@ -38,6 +41,7 @@ const Letter: React.FC<LetterProps> = ({ onSave, onClose }) => {
     setTimeout(() => {
       setBurnDone(true);
       setText("");
+      setTo(""); // ✅ clear To also
     }, 1800);
 
     // close after burn
@@ -92,6 +96,14 @@ const Letter: React.FC<LetterProps> = ({ onSave, onClose }) => {
             </div>
           </div>
         )}
+
+        {/* ✅ NEW: "To" field */}
+        <input
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder="To (optional)..."
+          className="w-full mb-4 px-4 py-3 rounded-2xl border border-aura-100 bg-aura-50/30 outline-none font-serif text-aura-900 placeholder-aura-300 focus:ring-2 ring-aura-200"
+        />
 
         <textarea
           ref={textareaRef}
