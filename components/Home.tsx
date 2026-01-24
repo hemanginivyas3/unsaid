@@ -1,13 +1,23 @@
-import React from "react";
-import { ViewMode } from "../types";
+import React, { useMemo } from "react";
+import { Entry, ViewMode } from "../types";
 
 interface HomeProps {
   onViewChange: (view: ViewMode) => void;
+  entries?: Entry[];
 }
 
-const Home: React.FC<HomeProps> = ({ onViewChange }) => {
+const Home: React.FC<HomeProps> = ({ onViewChange, entries = [] }) => {
+  const todayCount = useMemo(() => {
+    const today = new Date().toDateString();
+    return entries.filter((e) => new Date(e.timestamp).toDateString() === today)
+      .length;
+  }, [entries]);
+
+  const totalCount = entries.length;
+
   return (
     <div className="space-y-10 fade-in">
+      {/* Header */}
       <div className="space-y-2">
         <h1 className="text-4xl font-serif text-aura-900 leading-tight">
           Welcome to your sanctuary.
@@ -17,18 +27,39 @@ const Home: React.FC<HomeProps> = ({ onViewChange }) => {
         </p>
       </div>
 
-      {/* ✅ Main Action Card (changed from AI Chat to Journal) */}
+      {/* Mini Stats */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm">
+          <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
+            Today
+          </p>
+          <p className="text-3xl font-serif text-aura-900 mt-2">{todayCount}</p>
+          <p className="text-aura-400 text-xs mt-1">entries written</p>
+        </div>
+
+        <div className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm">
+          <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
+            Total
+          </p>
+          <p className="text-3xl font-serif text-aura-900 mt-2">{totalCount}</p>
+          <p className="text-aura-400 text-xs mt-1">saved in diary</p>
+        </div>
+      </div>
+
+      {/* Main Action Card */}
       <button
         onClick={() => onViewChange("diary")}
         className="w-full bg-gradient-to-br from-aura-800 to-aura-900 p-8 rounded-[2.5rem] text-left shadow-2xl relative overflow-hidden group hover:scale-[1.01] transition-all"
       >
         <div className="relative z-10">
           <span className="text-aura-200 text-xs font-bold uppercase tracking-widest mb-2 block">
-            Your Space
+            Your Diary
           </span>
-          <h2 className="text-white text-3xl font-serif mb-2">Open Journal</h2>
+          <h2 className="text-white text-3xl font-serif mb-2">
+            Open your vault
+          </h2>
           <p className="text-aura-300 text-sm max-w-[260px] leading-relaxed">
-            Read your past reflections, vents, letters and emotions — anytime.
+            Read your reflections, vents, letters, voice notes — anytime.
           </p>
         </div>
 
@@ -43,69 +74,53 @@ const Home: React.FC<HomeProps> = ({ onViewChange }) => {
         </div>
       </button>
 
-      <div className="grid grid-cols-2 gap-4">
-        <button
-          onClick={() => onViewChange("listener")}
-          className="bg-white p-6 rounded-[2.5rem] border border-aura-100 shadow-sm text-left hover:shadow-md transition-all group"
-        >
-          <div className="w-10 h-10 rounded-2xl bg-aura-50 flex items-center justify-center mb-4 group-hover:bg-aura-100 transition-colors">
-            <svg
-              className="h-5 w-5 text-aura-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-              />
-            </svg>
-          </div>
-          <h3 className="text-lg font-serif text-aura-800 mb-1">
-            Deep Reflection
-          </h3>
-          <p className="text-[10px] text-aura-400 font-bold uppercase tracking-tighter">
-            Speak or write freely
-          </p>
-        </button>
+      {/* Quick Actions */}
+      <div>
+        <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest mb-3">
+          Quick actions
+        </p>
 
-        <button
-          onClick={() => onViewChange("letter")}
-          className="bg-white p-6 rounded-[2.5rem] border border-aura-100 shadow-sm text-left hover:shadow-md transition-all group"
-        >
-          <div className="w-10 h-10 rounded-2xl bg-aura-50 flex items-center justify-center mb-4 group-hover:bg-aura-100 transition-colors">
-            <svg
-              className="h-5 w-5 text-aura-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
-          </div>
-          <h3 className="text-lg font-serif text-aura-800 mb-1">
-            Secret Letter
-          </h3>
-          <p className="text-[10px] text-aura-400 font-bold uppercase tracking-tighter">
-            Seal & release
-          </p>
-        </button>
+        <div className="grid grid-cols-2 gap-4">
+          <button
+            onClick={() => onViewChange("listener")}
+            className="bg-white p-6 rounded-[2.5rem] border border-aura-100 shadow-sm text-left hover:shadow-md transition-all group"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-aura-50 flex items-center justify-center mb-4 group-hover:bg-aura-100 transition-colors">
+              🎙️
+            </div>
+            <h3 className="text-lg font-serif text-aura-800 mb-1">
+              Reflection / Vent
+            </h3>
+            <p className="text-[10px] text-aura-400 font-bold uppercase tracking-tighter">
+              Write or record
+            </p>
+          </button>
+
+          <button
+            onClick={() => onViewChange("letter")}
+            className="bg-white p-6 rounded-[2.5rem] border border-aura-100 shadow-sm text-left hover:shadow-md transition-all group"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-aura-50 flex items-center justify-center mb-4 group-hover:bg-aura-100 transition-colors">
+              💌
+            </div>
+            <h3 className="text-lg font-serif text-aura-800 mb-1">
+              Secret Letter
+            </h3>
+            <p className="text-[10px] text-aura-400 font-bold uppercase tracking-tighter">
+              Seal & release
+            </p>
+          </button>
+        </div>
       </div>
 
+      {/* Daily quote */}
       <div className="bg-aura-100/50 p-6 rounded-[2.5rem] border border-aura-200/50 flex items-center justify-between">
         <div className="flex flex-col">
           <span className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
             Daily Wisdom
           </span>
           <p className="text-aura-800 font-serif italic text-sm mt-1">
-            "Your heart is a sanctuary. Keep its doors open to yourself."
+            "You deserve the same softness you give others."
           </p>
         </div>
       </div>
