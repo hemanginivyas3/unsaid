@@ -24,6 +24,7 @@ export interface Entry {
   isPinned?: boolean;
   isFavorite?: boolean;
   audioId?: string;
+  mood?: string;
 
 }
 

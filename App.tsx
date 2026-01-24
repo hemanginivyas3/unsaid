@@ -153,7 +153,7 @@ const deleteEntryById = (id: string) => {
         );
 
       default:
-        return <Home onViewChange={setActiveView} entries={entries} />;
+        return <Home onViewChange={setActiveView} entries={entries} onQuickSave={handleSaveEntry}  />;
     }
   };
 
