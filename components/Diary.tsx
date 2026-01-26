@@ -183,50 +183,60 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
   };
 
   // ✅ Decrypt component
-  const DecryptedText: React.FC<{ text: string; lockMode: boolean }> = ({ text, lockMode }) => {
-    const [decoded, setDecoded] = useState("Decrypting...");
+  const DecryptedText: React.FC<{ text?: string; lockMode: boolean }> = ({
+  text,
+  lockMode,
+}) => {
+  const [decoded, setDecoded] = useState("Decrypting...");
 
-    useEffect(() => {
-      let mounted = true;
+  useEffect(() => {
+    let mounted = true;
 
-      const run = async () => {
-        try {
-          if (!text) {
-            if (mounted) setDecoded("");
-            return;
-          }
-
-          // ✅ Not encrypted (old entries)
-          if (!text.includes(":")) {
-            if (mounted) setDecoded(text);
-            return;
-          }
-
-          const plain = await decryptText(text);
-          if (mounted) setDecoded(plain);
-        } catch (e) {
-          console.error(e);
-          if (mounted) setDecoded("⚠️ Could not decrypt this entry.");
+    const run = async () => {
+      try {
+        if (!text || typeof text !== "string") {
+          if (mounted) setDecoded("(Empty entry)");
+          return;
         }
-      };
 
-      run();
+        // ✅ if plain text (not encrypted)
+        if (!text.includes(":")) {
+          if (mounted) setDecoded(text);
+          return;
+        }
 
-      return () => {
-        mounted = false;
-      };
-    }, [text]);
+        const plain = await decryptText(text);
 
-    return (
-      <p
-        className={`text-aura-900 font-serif text-lg leading-relaxed whitespace-pre-wrap transition-all ${
-          lockMode ? "blur-sm select-none" : ""
-        }`}
-      >
-        {decoded}
-      </p>
-    );
-  };
+        // ✅ if decrypt returns empty
+        if (!plain || !plain.trim()) {
+          if (mounted) setDecoded("⚠️ Could not decrypt this entry.");
+          return;
+        }
+
+        if (mounted) setDecoded(plain);
+      } catch (e) {
+        console.error("Decrypt error:", e);
+        if (mounted) setDecoded("⚠️ Could not decrypt this entry.");
+      }
+    };
+
+    run();
+
+    return () => {
+      mounted = false;
+    };
+  }, [text]);
+
+  return (
+    <p
+      className={`text-aura-900 font-serif text-lg leading-relaxed whitespace-pre-wrap transition-all ${
+        lockMode ? "blur-sm select-none" : ""
+      }`}
+    >
+      {decoded}
+    </p>
+  );
+};
 
   return (
     <div className="space-y-8 fade-in">
