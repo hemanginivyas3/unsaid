@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Entry } from "../types";
 import { getAudioBlob } from "../audioStore";
+import { decryptText } from "../crypto";
 
 interface DiaryProps {
   entries: Entry[];
@@ -21,11 +22,11 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
   // ✅ Lock Mode
   const [lockMode, setLockMode] = useState(false);
 
-  // ✅ Undo delete state
+  // ✅ Undo delete
   const [undoEntry, setUndoEntry] = useState<Entry | null>(null);
   const [undoTimer, setUndoTimer] = useState<any>(null);
 
-  // ✅ Voice note UI states (Play/Pause controls)
+  // ✅ Voice note open/close
   const [openAudioId, setOpenAudioId] = useState<string | null>(null);
   const [openAudioUrl, setOpenAudioUrl] = useState<string | null>(null);
 
@@ -38,10 +39,9 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  // ✅ Open/Close voice note (with pause/play controls)
+  // ✅ Open/close voice note
   const openVoiceNote = async (audioId: string) => {
     try {
-      // if same audio is open → close
       if (openAudioId === audioId) {
         setOpenAudioId(null);
         setOpenAudioUrl(null);
@@ -126,7 +126,7 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
 
     if (query.trim()) {
       const q = query.toLowerCase();
-      result = result.filter((e) => e.content.toLowerCase().includes(q));
+      result = result.filter((e) => (e.content || "").toLowerCase().includes(q));
     }
 
     if (filterType !== "all") {
@@ -154,34 +154,11 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
     );
   };
 
-  // ✅ Toggle fav
+  // ✅ Toggle favourite
   const toggleFavorite = (id: string) => {
     onUpdateEntries((prev) =>
       prev.map((e) => (e.id === id ? { ...e, isFavorite: !e.isFavorite } : e))
     );
-  };
-
-  // ✅ Export diary
-  const exportDiaryTxt = () => {
-    const sorted = [...entries].sort((a, b) => b.timestamp - a.timestamp);
-
-    const txt = sorted
-      .map((e) => {
-        const date = new Date(e.timestamp).toLocaleString();
-        const emotions = e.emotions && e.emotions.length > 0 ? e.emotions.join(", ") : "None";
-        return `TYPE: ${e.type}\nDATE: ${date}\nEMOTIONS: ${emotions}\n\n${e.content}\n\n------------------------------\n`;
-      })
-      .join("\n");
-
-    const blob = new Blob([txt], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "unsaid-diary.txt";
-    a.click();
-
-    URL.revokeObjectURL(url);
   };
 
   // ✅ Delete + Undo
@@ -200,11 +177,55 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
 
   const handleUndo = () => {
     if (!undoEntry) return;
-
     onUpdateEntries((prev) => [undoEntry, ...prev]);
-
     setUndoEntry(null);
     if (undoTimer) clearTimeout(undoTimer);
+  };
+
+  // ✅ Decrypt component
+  const DecryptedText: React.FC<{ text: string; lockMode: boolean }> = ({ text, lockMode }) => {
+    const [decoded, setDecoded] = useState("Decrypting...");
+
+    useEffect(() => {
+      let mounted = true;
+
+      const run = async () => {
+        try {
+          if (!text) {
+            if (mounted) setDecoded("");
+            return;
+          }
+
+          // ✅ Not encrypted (old entries)
+          if (!text.includes(":")) {
+            if (mounted) setDecoded(text);
+            return;
+          }
+
+          const plain = await decryptText(text);
+          if (mounted) setDecoded(plain);
+        } catch (e) {
+          console.error(e);
+          if (mounted) setDecoded("⚠️ Could not decrypt this entry.");
+        }
+      };
+
+      run();
+
+      return () => {
+        mounted = false;
+      };
+    }, [text]);
+
+    return (
+      <p
+        className={`text-aura-900 font-serif text-lg leading-relaxed whitespace-pre-wrap transition-all ${
+          lockMode ? "blur-sm select-none" : ""
+        }`}
+      >
+        {decoded}
+      </p>
+    );
   };
 
   return (
@@ -225,19 +246,19 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
       {/* ✅ Dashboard */}
       <div className="bg-white rounded-[2.5rem] p-8 border border-aura-100 shadow-sm">
         <h2 className="text-2xl font-serif text-aura-900 italic">Your Diary</h2>
-        <p className="text-aura-400 text-sm mt-1">
-          A calm record of your thoughts, feelings, and wins.
-        </p>
+        <p className="text-aura-400 text-sm mt-1">A calm record of your thoughts and feelings.</p>
 
         <div className="grid grid-cols-3 gap-3 mt-6">
           <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
             <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">Total</p>
             <p className="text-2xl font-serif text-aura-900 mt-1">{totalEntries}</p>
           </div>
+
           <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
             <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">Today</p>
             <p className="text-2xl font-serif text-aura-900 mt-1">{todayEntriesCount}</p>
           </div>
+
           <div className="p-4 rounded-2xl bg-aura-50 border border-aura-100">
             <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">Streak</p>
             <p className="text-2xl font-serif text-aura-900 mt-1">{streak} 🔥</p>
@@ -275,30 +296,22 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
 
       {/* ✅ Pinned Entry */}
       {pinnedEntry && (
-        <div className="bg-gradient-to-br from-aura-800 to-aura-900 text-white rounded-[2.5rem] p-7 shadow-2xl relative overflow-hidden">
-          <div className="relative z-10">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-aura-200">
-              Pinned Entry 📌
-            </p>
-            <p
-              className={`font-serif text-xl mt-3 leading-relaxed whitespace-pre-wrap transition-all ${
-                lockMode ? "blur-sm select-none" : ""
-              }`}
-            >
-              {pinnedEntry.content}
-            </p>
-            <p className="text-aura-200 text-xs mt-4 font-bold">
-              {new Date(pinnedEntry.timestamp).toLocaleString()}
-            </p>
-          </div>
+        <div className="bg-gradient-to-br from-aura-800 to-aura-900 text-white rounded-[2.5rem] p-7 shadow-2xl">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-aura-200">
+            Pinned Entry 📌
+          </p>
+          <p className={`font-serif text-xl mt-3 leading-relaxed whitespace-pre-wrap ${lockMode ? "blur-sm select-none" : ""}`}>
+            {pinnedEntry.content}
+          </p>
+          <p className="text-aura-200 text-xs mt-4 font-bold">
+            {new Date(pinnedEntry.timestamp).toLocaleString()}
+          </p>
         </div>
       )}
 
       {/* ✅ Filters */}
       <div className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm space-y-4">
-        <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">
-          Search & Filter
-        </p>
+        <p className="text-[10px] font-bold text-aura-400 uppercase tracking-widest">Search & Filter</p>
 
         <input
           value={query}
@@ -365,13 +378,6 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
         </button>
 
         <button
-          onClick={exportDiaryTxt}
-          className="w-full py-3 rounded-2xl bg-white border border-aura-200 text-aura-700 font-bold text-sm hover:bg-aura-50 transition-all"
-        >
-          📤 Export Diary (.txt)
-        </button>
-
-        <button
           onClick={() => {
             setQuery("");
             setFilterType("all");
@@ -395,10 +401,7 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
           </div>
         ) : (
           filteredEntries.map((entry) => (
-            <div
-              key={entry.id}
-              className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm"
-            >
+            <div key={entry.id} className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-aura-400">
                   {entry.type}
@@ -408,14 +411,10 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
                 </span>
               </div>
 
-              <p
-                className={`text-aura-900 font-serif text-lg leading-relaxed whitespace-pre-wrap transition-all ${
-                  lockMode ? "blur-sm select-none" : ""
-                }`}
-              >
-                {entry.content}
-              </p>
+              {/* ✅ decrypted text */}
+              <DecryptedText text={entry.content} lockMode={lockMode} />
 
+              {/* ✅ emotions */}
               {entry.emotions && entry.emotions.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-4">
                   {entry.emotions.map((em) => (
@@ -429,16 +428,14 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
                 </div>
               )}
 
-              {/* ✅ Voice Note Section (Aesthetic + Play/Pause controls) */}
+              {/* ✅ voice note open/close */}
               {entry.audioId && (
                 <div className="mt-4 space-y-3">
                   <button
                     onClick={() => openVoiceNote(entry.audioId!)}
                     className="w-full py-3 rounded-2xl bg-aura-50 border border-aura-100 text-aura-700 font-bold text-sm hover:bg-aura-100 transition-all"
                   >
-                    {openAudioId === entry.audioId
-                      ? "✖ Close Voice Note"
-                      : "🎧 Open Voice Note"}
+                    {openAudioId === entry.audioId ? "✖ Close Voice Note" : "🎧 Open Voice Note"}
                   </button>
 
                   {openAudioId === entry.audioId && openAudioUrl && (
@@ -454,7 +451,7 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
                 </div>
               )}
 
-              {/* ✅ Actions */}
+              {/* ✅ actions */}
               <div className="grid grid-cols-3 gap-2 mt-5">
                 <button
                   onClick={() => pinEntry(entry.id)}

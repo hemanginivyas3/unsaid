@@ -1,12 +1,8 @@
-import Calendar from "./components/Calendar";
-import Journal from "./components/Journal";
-import NameSetup from "./NameSetup";
-import { getUserProfile } from "./userService";
 import React, { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 
-import Auth from "./Auth";
 import { auth } from "./firebase";
+import Auth from "./Auth";
 
 import Layout from "./components/Layout";
 import Home from "./components/Home";
@@ -14,8 +10,16 @@ import Listener from "./components/Listener";
 import Diary from "./components/Diary";
 import Letter from "./components/Letter";
 import Profile from "./components/Profile";
+import Calendar from "./components/Calendar";
+import Journal from "./components/Journal";
+
+import NameSetup from "./NameSetup";
+import { getUserProfile } from "./userService";
 
 import { ViewMode, Entry } from "./types";
+
+import { encryptText } from "./crypto";
+import { saveEncryptedEntry, getEncryptedEntries } from "./entriesService";
 
 const App: React.FC = () => {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
@@ -27,20 +31,19 @@ const App: React.FC = () => {
   const [userName, setUserName] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
 
-  // ✅ ALWAYS runs (no conditional hooks)
+  // ✅ Auth Listener
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setFirebaseUser(u);
       setLoadingAuth(false);
 
-      if (u) {
-        setActiveView("home");
-      }
+      if (u) setActiveView("home");
     });
 
     return () => unsub();
   }, []);
 
+  // ✅ Load Profile
   useEffect(() => {
     const loadProfile = async () => {
       if (!firebaseUser) return;
@@ -55,23 +58,51 @@ const App: React.FC = () => {
     loadProfile();
   }, [firebaseUser]);
 
-  // ✅ Load entries only after we know the user
+  // ✅ Load entries from Firestore first, fallback to localStorage
   useEffect(() => {
-    if (!firebaseUser) return;
+    const loadEntries = async () => {
+      if (!firebaseUser) return;
 
-    const savedEntries = localStorage.getItem(
-      `aura_entries_${firebaseUser.uid}`
-    );
-    if (savedEntries) {
       try {
-        setEntries(JSON.parse(savedEntries));
-      } catch (e) {
-        console.error("Failed to parse entries", e);
+        const cloud = await getEncryptedEntries(firebaseUser.uid);
+
+        if (cloud.length > 0) {
+          setEntries(
+            cloud.map((e: any) => ({
+              id: e.id,
+              timestamp: e.timestamp,
+              content: e.content, // ✅ encrypted text stored
+              type: e.type,
+              emotions: e.emotions || [],
+              audioId: e.audioId || undefined,
+              isPinned: false,
+              isFavorite: false,
+            }))
+          );
+          return;
+        }
+      } catch (err) {
+        console.error("Firestore load failed. Using local backup:", err);
       }
-    }
+
+      // fallback local
+      const savedEntries = localStorage.getItem(
+        `aura_entries_${firebaseUser.uid}`
+      );
+
+      if (savedEntries) {
+        try {
+          setEntries(JSON.parse(savedEntries));
+        } catch (e) {
+          console.error("Failed to parse entries", e);
+        }
+      }
+    };
+
+    loadEntries();
   }, [firebaseUser]);
 
-  // ✅ Sync entries only after user exists
+  // ✅ Sync localStorage backup
   useEffect(() => {
     if (!firebaseUser) return;
 
@@ -86,25 +117,57 @@ const App: React.FC = () => {
     setEntries([]);
   };
 
-  const handleSaveEntry = (newEntry: Partial<Entry>) => {
+  // ✅ SAVE ENTRY (encrypt + local + firestore)
+  const handleSaveEntry = async (newEntry: Partial<Entry>) => {
+    if (!firebaseUser) return;
+
+    const rawContent = newEntry.content || "";
+
+    const encryptedContent = rawContent.trim()
+      ? await encryptText(rawContent)
+      : "";
+
     const entry: Entry = {
       id: Math.random().toString(36).substr(2, 9),
       timestamp: Date.now(),
-      content: "",
+      content: encryptedContent, // ✅ stored encrypted
       type: "vent",
+      emotions: [],
       ...newEntry,
     };
 
+    // ✅ Save locally (fast)
     setEntries((prev) => [entry, ...prev]);
+
+    // ✅ Save encrypted to Firestore (cloud sync)
+    try {
+      await saveEncryptedEntry({
+        userId: firebaseUser.uid,
+        encryptedContent: encryptedContent,
+        type: entry.type,
+        emotions: entry.emotions || [],
+        audioId: entry.audioId,
+        timestamp: entry.timestamp,
+      });
+    } catch (err) {
+      console.error("Firestore save failed:", err);
+    }
   };
-const deleteEntryById = (id: string) => {
-  setEntries((prev) => prev.filter((e) => e.id !== id));
-};
+
+  const deleteEntryById = (id: string) => {
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+  };
 
   const renderContent = () => {
     switch (activeView) {
       case "home":
-        return <Home onViewChange={setActiveView} />;
+        return (
+          <Home
+            onViewChange={setActiveView}
+            entries={entries}
+            onQuickSave={handleSaveEntry}
+          />
+        );
 
       case "calendar":
         return <Calendar entries={entries} />;
@@ -118,14 +181,13 @@ const deleteEntryById = (id: string) => {
         );
 
       case "diary":
-  return (
-    <Diary
-      entries={entries}
-      onUpdateEntries={setEntries}
-      onDeleteEntry={deleteEntryById}
-    />
-  );
-
+        return (
+          <Diary
+            entries={entries}
+            onUpdateEntries={setEntries}
+            onDeleteEntry={deleteEntryById}
+          />
+        );
 
       case "letter":
         return (
@@ -135,7 +197,6 @@ const deleteEntryById = (id: string) => {
           />
         );
 
-      // ✅ NEW JOURNAL SCREEN
       case "journal":
         return <Journal />;
 
@@ -153,51 +214,41 @@ const deleteEntryById = (id: string) => {
         );
 
       default:
-        return <Home onViewChange={setActiveView} entries={entries} onQuickSave={handleSaveEntry}  />;
+        return (
+          <Home
+            onViewChange={setActiveView}
+            entries={entries}
+            onQuickSave={handleSaveEntry}
+          />
+        );
     }
   };
 
-  // ✅ While auth is loading
+  // ✅ Auth loading
   if (loadingAuth) {
     return <div style={{ padding: 20 }}>Loading...</div>;
   }
 
-  // ✅ If not logged in
+  // ✅ Not logged in
   if (!firebaseUser) {
     return <Auth />;
   }
 
+  // ✅ Profile loading
   if (profileLoading) {
-  return <div style={{ padding: 20 }}>Loading profile...</div>;
-}
+    return <div style={{ padding: 20 }}>Loading profile...</div>;
+  }
 
-// ✅ if profile doesn't exist, go to NameSetup
-if (!userName) {
-  return (
-    <NameSetup
-      uid={firebaseUser.uid}
-      onDone={(name) => setUserName(name)}
-    />
-  );
-}
-
-
+  // ✅ Ask name if missing
   if (!userName) {
     return (
-      <NameSetup
-        uid={firebaseUser.uid}
-        onDone={(name) => setUserName(name)}
-      />
+      <NameSetup uid={firebaseUser.uid} onDone={(name) => setUserName(name)} />
     );
   }
 
-  // ✅ If logged in → show full app
+  // ✅ Logged in → show app
   return (
-    <Layout
-      activeView={activeView}
-      onViewChange={setActiveView}
-      isLoggedIn={true}
-    >
+    <Layout activeView={activeView} onViewChange={setActiveView} isLoggedIn>
       {renderContent()}
     </Layout>
   );
