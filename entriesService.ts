@@ -1,4 +1,4 @@
-import { addDoc, collection, getDocs, orderBy, query, serverTimestamp, where } from "firebase/firestore";
+import { addDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "./firebase";
 
 export async function saveEncryptedEntry(entry: {
@@ -13,23 +13,32 @@ export async function saveEncryptedEntry(entry: {
 
   return await addDoc(ref, {
     userId: entry.userId,
-    content: entry.encryptedContent, // ✅ encrypted only
+    encryptedContent: entry.encryptedContent,
     type: entry.type,
     emotions: entry.emotions || [],
     audioId: entry.audioId || null,
     timestamp: entry.timestamp,
-    createdAt: serverTimestamp(),
   });
 }
 
 export async function getEncryptedEntries(userId: string) {
   const ref = collection(db, "entries");
 
-  const q = query(ref, where("userId", "==", userId), orderBy("timestamp", "desc"));
+  const q = query(ref, where("userId", "==", userId));
   const snap = await getDocs(q);
 
-  return snap.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as any),
-  }));
+  return snap.docs.map((doc) => {
+    const d = doc.data();
+
+    return {
+      id: doc.id,
+      timestamp: d.timestamp,
+      content: d.encryptedContent, // ✅ encrypted stays in `content`
+      type: d.type,
+      emotions: d.emotions || [],
+      audioId: d.audioId || undefined,
+      isPinned: false,
+      isFavorite: false,
+    };
+  });
 }

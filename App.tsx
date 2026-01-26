@@ -71,7 +71,7 @@ const App: React.FC = () => {
             cloud.map((e: any) => ({
               id: e.id,
               timestamp: e.timestamp,
-              content: e.content, // ✅ encrypted text stored
+              content: e.encryptedContent, // ✅ IMPORTANT FIX
               type: e.type,
               emotions: e.emotions || [],
               audioId: e.audioId || undefined,
@@ -102,7 +102,7 @@ const App: React.FC = () => {
     loadEntries();
   }, [firebaseUser]);
 
-  // ✅ Sync localStorage backup
+  // ✅ Sync localStorage backup (only as backup)
   useEffect(() => {
     if (!firebaseUser) return;
 
@@ -130,13 +130,15 @@ const App: React.FC = () => {
     const entry: Entry = {
       id: Math.random().toString(36).substr(2, 9),
       timestamp: Date.now(),
-      content: encryptedContent, // ✅ stored encrypted
-      type: "vent",
-      emotions: [],
-      ...newEntry,
+      type: newEntry.type || "vent",
+      emotions: newEntry.emotions || [],
+      audioId: newEntry.audioId,
+      content: encryptedContent, // ✅ encrypted stored here
+      isPinned: newEntry.isPinned || false,
+      isFavorite: newEntry.isFavorite || false,
     };
 
-    // ✅ Save locally (fast)
+    // ✅ Save locally (fast UI)
     setEntries((prev) => [entry, ...prev]);
 
     // ✅ Save encrypted to Firestore (cloud sync)
