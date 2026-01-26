@@ -107,6 +107,20 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
         aiReply: "",
       });
 
+      // ✅ VENT mode → NO emotion tagging screen
+      if (mode === "vent") {
+        onSave({
+          content: text || "(Voice Note)",
+          type: "vent",
+          emotions: [],
+          audioId: recordedAudioId || undefined,
+        });
+
+        onClose();
+        return;
+      }
+
+      // ✅ REFLECTION mode → show emotion screen
       setShowEmotions(true);
       setInfoMsg("");
     } catch (e) {
@@ -115,7 +129,7 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
     }
   };
 
-  // ✅ Emotion label screen
+  // ✅ Emotion label screen (ONLY for Reflection)
   if (showEmotions) {
     return (
       <div className="flex-1 flex flex-col justify-center fade-in max-w-lg mx-auto w-full">
@@ -145,7 +159,7 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
               onClick={() => {
                 onSave({
                   content: text || "(Voice Note)",
-                  type: mode === "reflection" ? "reflection" : "vent",
+                  type: "reflection",
                   emotions: selectedEmotions,
                   audioId: recordedAudioId || undefined,
                 });
@@ -204,7 +218,11 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
           ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Speak or write your truth..."
+          placeholder={
+            mode === "vent"
+              ? "Let it out. No filters. No judgement..."
+              : "Speak or write your truth..."
+          }
           className="w-full flex-1 bg-transparent text-xl text-aura-900 placeholder-aura-200 focus:outline-none resize-none font-serif leading-relaxed"
         />
 
@@ -250,6 +268,7 @@ const Listener: React.FC<ListenerProps> = ({ onSave, onClose }) => {
 
           <button
             onClick={handleFinish}
+            disabled={!text.trim() && !recordedAudioId}
             className="px-8 py-3 bg-aura-800 text-white rounded-2xl font-bold shadow-lg disabled:opacity-30"
           >
             Finish
