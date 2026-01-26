@@ -50,7 +50,7 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
 
       const blob = await getAudioBlob(audioId);
       if (!blob) {
-        alert("Audio not found 😢");
+        alert("This voice note is saved only on the device where it was recorded 💙");
         return;
       }
 

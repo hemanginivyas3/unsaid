@@ -16,8 +16,9 @@ export async function saveEncryptedEntry(entry: {
     encryptedContent: entry.encryptedContent,
     type: entry.type,
     emotions: entry.emotions || [],
-    audioId: entry.audioId || null,
     timestamp: entry.timestamp,
+    
+    audioId: null,
   });
 }
 
