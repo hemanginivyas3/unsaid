@@ -60,47 +60,35 @@ const App: React.FC = () => {
 
   // ✅ Load entries from Firestore first, fallback to localStorage
   useEffect(() => {
-    const loadEntries = async () => {
-      if (!firebaseUser) return;
+  const loadEntries = async () => {
+    if (!firebaseUser) return;
 
+    try {
+      const cloudEntries = await getEncryptedEntries(firebaseUser.uid);
+
+      // ✅ ALWAYS load from Firestore if possible
+      if (cloudEntries && cloudEntries.length >= 0) {
+        setEntries(cloudEntries);
+        return;
+      }
+    } catch (err) {
+      console.error("Firestore load failed. Using local backup:", err);
+    }
+
+    // ✅ fallback localStorage
+    const savedEntries = localStorage.getItem(`aura_entries_${firebaseUser.uid}`);
+    if (savedEntries) {
       try {
-        const cloud = await getEncryptedEntries(firebaseUser.uid);
-
-        if (cloud.length > 0) {
-          setEntries(
-            cloud.map((e: any) => ({
-              id: e.id,
-              timestamp: e.timestamp,
-              content: e.encryptedContent, // ✅ IMPORTANT FIX
-              type: e.type,
-              emotions: e.emotions || [],
-              audioId: e.audioId || undefined,
-              isPinned: false,
-              isFavorite: false,
-            }))
-          );
-          return;
-        }
-      } catch (err) {
-        console.error("Firestore load failed. Using local backup:", err);
+        setEntries(JSON.parse(savedEntries));
+      } catch (e) {
+        console.error("Failed to parse local entries", e);
       }
+    }
+  };
 
-      // fallback local
-      const savedEntries = localStorage.getItem(
-        `aura_entries_${firebaseUser.uid}`
-      );
+  loadEntries();
+}, [firebaseUser]);
 
-      if (savedEntries) {
-        try {
-          setEntries(JSON.parse(savedEntries));
-        } catch (e) {
-          console.error("Failed to parse entries", e);
-        }
-      }
-    };
-
-    loadEntries();
-  }, [firebaseUser]);
 
   // ✅ Sync localStorage backup (only as backup)
   useEffect(() => {
@@ -113,6 +101,9 @@ const App: React.FC = () => {
   }, [entries, firebaseUser]);
 
   const handleLogout = async () => {
+    if (firebaseUser) {
+    localStorage.removeItem(`aura_entries_${firebaseUser.uid}`);
+  }
     await signOut(auth);
     setEntries([]);
   };
