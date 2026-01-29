@@ -1,3 +1,5 @@
+import { decryptText } from "../crypto";
+import { useEffect } from "react";
 import React, { useMemo, useState } from "react";
 import { Entry } from "../types";
 
@@ -71,6 +73,43 @@ const Calendar: React.FC<CalendarProps> = ({ entries }) => {
   };
 
   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const DecryptedText: React.FC<{ text: string }> = ({ text }) => {
+  const [decoded, setDecoded] = useState("Decrypting...");
+
+  useEffect(() => {
+    let mounted = true;
+
+    const run = async () => {
+      try {
+        // If plain text (old entries)
+        if (!text.includes(":")) {
+          if (mounted) setDecoded(text);
+          return;
+        }
+
+        const plain = await decryptText(text);
+        if (mounted) setDecoded(plain);
+      } catch (e) {
+        console.error(e);
+        if (mounted) setDecoded("⚠️ Could not decrypt entry");
+      }
+    };
+
+    run();
+
+    return () => {
+      mounted = false;
+    };
+  }, [text]);
+
+  return (
+    <p className="text-aura-900 font-serif text-base leading-relaxed whitespace-pre-wrap">
+      {decoded}
+    </p>
+  );
+};
+
 
   return (
     <div className="space-y-8 fade-in">
@@ -179,9 +218,8 @@ const Calendar: React.FC<CalendarProps> = ({ entries }) => {
                     </span>
                   </div>
 
-                  <p className="text-aura-900 font-serif text-base leading-relaxed whitespace-pre-wrap">
-                    {entry.content}
-                  </p>
+                  <DecryptedText text={entry.content} />
+
 
                   {entry.emotions && entry.emotions.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-3">
