@@ -1,50 +1,37 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Entry } from "../types";
-import { getAudioBlob } from "../audioStore";
 import { decryptText } from "../crypto";
 import { doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
+/* =======================
+   Props
+======================= */
+
 interface DiaryProps {
   entries: Entry[];
   onUpdateEntries: React.Dispatch<React.SetStateAction<Entry[]>>;
-  onDeleteEntry: (id: string) => void;
 }
 
-type SortMode = "newest" | "oldest";
-type FilterType = "all" | "vent" | "reflection" | "letter";
+/* =======================
+   Component
+======================= */
 
-const Diary: React.FC<DiaryProps> = ({
-  entries,
-  onUpdateEntries,
-}) => {
-  const [query, setQuery] = useState("");
-  const [sortMode, setSortMode] = useState<SortMode>("newest");
-  const [filterType, setFilterType] = useState<FilterType>("all");
-  const [filterEmotion, setFilterEmotion] = useState("all");
-  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries }) => {
+  const [search, setSearch] = useState("");
   const [lockMode, setLockMode] = useState(false);
 
   const [undoEntry, setUndoEntry] = useState<Entry | null>(null);
-  const [undoTimer, setUndoTimer] = useState<NodeJS.Timeout | null>(null);
+  const [undoTimer, setUndoTimer] = useState<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
-  const [openAudioId, setOpenAudioId] = useState<string | null>(null);
-  const [openAudioUrl, setOpenAudioUrl] = useState<string | null>(null);
+  /* =======================
+     Decryption renderer
+  ======================= */
 
-  /* ---------- helpers ---------- */
-
-  const dayKey = (ts: number) => {
-    const d = new Date(ts);
-    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-  };
-
-  /* ---------- decrypt text ---------- */
-
-  const DecryptedText: React.FC<{ text?: string; lock: boolean }> = ({
-    text,
-    lock,
-  }) => {
-    const [decoded, setDecoded] = useState("Decrypting...");
+  const DecryptedText: React.FC<{ text?: string }> = ({ text }) => {
+    const [decoded, setDecoded] = useState("Decrypting…");
 
     useEffect(() => {
       let mounted = true;
@@ -55,6 +42,7 @@ const Diary: React.FC<DiaryProps> = ({
           return;
         }
 
+        // plain text (fallback)
         if (!text.includes(":")) {
           mounted && setDecoded(text);
           return;
@@ -76,8 +64,8 @@ const Diary: React.FC<DiaryProps> = ({
 
     return (
       <p
-        className={`whitespace-pre-wrap font-serif text-lg ${
-          lock ? "blur-sm select-none" : ""
+        className={`font-serif text-lg whitespace-pre-wrap transition-all ${
+          lockMode ? "blur-sm select-none" : ""
         }`}
       >
         {decoded}
@@ -85,25 +73,31 @@ const Diary: React.FC<DiaryProps> = ({
     );
   };
 
-  /* ---------- pin / unpin ---------- */
+  /* =======================
+     Pin / Unpin
+  ======================= */
 
   const pinEntry = async (entry: Entry) => {
-    const newPinnedState = !entry.isPinned;
+    const newPinned = !entry.isPinned;
 
+    // UI update
     onUpdateEntries((prev) =>
       prev.map((e) =>
         e.id === entry.id
-          ? { ...e, isPinned: newPinnedState }
+          ? { ...e, isPinned: newPinned }
           : { ...e, isPinned: false }
       )
     );
 
+    // Persist
     await updateDoc(doc(db, "entries", entry.id), {
-      isPinned: newPinnedState,
+      isPinned: newPinned,
     });
   };
 
-  /* ---------- delete ---------- */
+  /* =======================
+     Delete + Undo
+  ======================= */
 
   const deleteWithUndo = async (entry: Entry) => {
     onUpdateEntries((prev) => prev.filter((e) => e.id !== entry.id));
@@ -120,83 +114,117 @@ const Diary: React.FC<DiaryProps> = ({
     setUndoTimer(t);
   };
 
-  /* ---------- filtering ---------- */
+  /* =======================
+     Derived state
+  ======================= */
 
   const pinnedEntry = useMemo(
     () => entries.find((e) => e.isPinned),
     [entries]
   );
 
-  const filteredEntries = useMemo(() => {
-    let result = entries.filter((e) => !e.isPinned);
+  const visibleEntries = useMemo(() => {
+    const base = entries.filter((e) => !e.isPinned);
 
-    if (query.trim()) {
-      result = result.filter((e) =>
-        (e.content || "").toLowerCase().includes(query.toLowerCase())
-      );
-    }
+    if (!search.trim()) return base;
 
-    if (filterType !== "all") {
-      result = result.filter((e) => e.type === filterType);
-    }
-
-    if (filterEmotion !== "all") {
-      result = result.filter((e) => e.emotions?.includes(filterEmotion));
-    }
-
-    if (showOnlyFavorites) {
-      result = result.filter((e) => e.isFavorite);
-    }
-
-    result.sort((a, b) =>
-      sortMode === "newest"
-        ? b.timestamp - a.timestamp
-        : a.timestamp - b.timestamp
+    const q = search.toLowerCase();
+    return base.filter((e) =>
+      (e.content || "").toLowerCase().includes(q)
     );
+  }, [entries, search]);
 
-    return result;
-  }, [
-    entries,
-    query,
-    sortMode,
-    filterType,
-    filterEmotion,
-    showOnlyFavorites,
-  ]);
-
-  /* ---------- render ---------- */
+  /* =======================
+     Render
+  ======================= */
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 fade-in">
+
+      {/* Undo bar */}
       {undoEntry && (
-        <div className="bg-aura-800 text-white p-4 rounded-xl flex justify-between">
-          <span>Entry deleted</span>
+        <div className="bg-aura-800 text-white px-6 py-4 rounded-2xl flex justify-between items-center">
+          <span className="font-bold text-sm">Entry deleted</span>
         </div>
       )}
 
+      {/* Header */}
+      <div className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm">
+        <h2 className="text-2xl font-serif italic text-aura-900">Your Diary</h2>
+        <p className="text-aura-400 text-sm mt-1">
+          A private record of your thoughts.
+        </p>
+
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search your diary…"
+            className="px-4 py-3 rounded-2xl border border-aura-200 bg-aura-50/40 font-serif outline-none"
+          />
+
+          <button
+            onClick={() => setLockMode((p) => !p)}
+            className={`rounded-2xl font-bold text-sm transition-all ${
+              lockMode
+                ? "bg-aura-800 text-white"
+                : "bg-white border border-aura-200 text-aura-700 hover:bg-aura-50"
+            }`}
+          >
+            {lockMode ? "🔒 Lock Mode ON" : "🔓 Turn ON Lock Mode"}
+          </button>
+        </div>
+      </div>
+
+      {/* Pinned */}
       {pinnedEntry && (
-        <div className="bg-aura-900 text-white p-6 rounded-2xl">
-          <p className="text-xs uppercase">Pinned</p>
-          <DecryptedText text={pinnedEntry.content} lock={lockMode} />
+        <div className="bg-gradient-to-br from-aura-800 to-aura-900 text-white rounded-[2.5rem] p-6 shadow-xl">
+          <p className="text-[10px] uppercase tracking-widest opacity-80">
+            Pinned Entry
+          </p>
+
+          <DecryptedText text={pinnedEntry.content} />
+
           <button
             onClick={() => pinEntry(pinnedEntry)}
-            className="mt-3 text-sm underline"
+            className="mt-4 text-sm underline opacity-80"
           >
             Unpin
           </button>
         </div>
       )}
 
-      {filteredEntries.map((entry) => (
-        <div key={entry.id} className="bg-white p-6 rounded-2xl shadow">
-          <DecryptedText text={entry.content} lock={lockMode} />
-
-          <div className="flex gap-2 mt-4">
-            <button onClick={() => pinEntry(entry)}>📌</button>
-            <button onClick={() => deleteWithUndo(entry)}>🗑</button>
-          </div>
+      {/* Entries */}
+      {visibleEntries.length === 0 ? (
+        <div className="bg-white rounded-[2.5rem] p-8 border border-aura-100 text-aura-400">
+          No entries found.
         </div>
-      ))}
+      ) : (
+        visibleEntries.map((entry) => (
+          <div
+            key={entry.id}
+            className="bg-white rounded-[2.5rem] p-6 border border-aura-100 shadow-sm"
+          >
+            <DecryptedText text={entry.content} />
+
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => pinEntry(entry)}
+                className="px-4 py-2 rounded-xl bg-aura-50 border border-aura-100"
+              >
+                📌
+              </button>
+
+              <button
+                onClick={() => deleteWithUndo(entry)}
+                className="px-4 py-2 rounded-xl bg-white border border-red-200 text-red-500"
+              >
+                🗑
+              </button>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 };
