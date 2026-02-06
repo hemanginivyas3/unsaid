@@ -8,6 +8,7 @@ export async function saveEncryptedEntry(entry: {
   emotions: string[];
   audioId?: string;
   timestamp: number;
+  isPinned?: boolean;
 }) {
   const ref = collection(db, "entries");
 
@@ -17,8 +18,8 @@ export async function saveEncryptedEntry(entry: {
     type: entry.type,
     emotions: entry.emotions || [],
     timestamp: entry.timestamp,
-    
-    audioId: null,
+    isPinned: entry.isPinned || false,
+    audioId: entry.audioId || null,
   });
 }
 
@@ -38,7 +39,7 @@ export async function getEncryptedEntries(userId: string) {
       type: d.type,
       emotions: d.emotions || [],
       audioId: d.audioId || undefined,
-      isPinned: false,
+      isPinned: d.isPinned || false,
       isFavorite: false,
     };
   });
