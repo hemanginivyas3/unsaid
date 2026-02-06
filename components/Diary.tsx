@@ -146,13 +146,16 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
 
   // ✅ Pin entry
   const pinEntry = (id: string) => {
-    onUpdateEntries((prev) =>
-      prev.map((e) => {
-        if (e.id === id) return { ...e, isPinned: true };
-        return { ...e, isPinned: false };
-      })
-    );
-  };
+  onUpdateEntries((prev) =>
+    prev.map((e) => {
+      if (e.id === id) {
+        return { ...e, isPinned: !e.isPinned }; // toggle
+      }
+      return { ...e, isPinned: false };
+    })
+  );
+};
+
 
   // ✅ Toggle favourite
   const toggleFavorite = (id: string) => {
@@ -163,8 +166,13 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
 
   // ✅ Delete + Undo
   const deleteWithUndo = (entry: Entry) => {
-    onDeleteEntry(entry.id);
-    setUndoEntry(entry);
+  onUpdateEntries((prev) =>
+    prev.filter((e) => e.id !== entry.id)
+      .map((e) => ({ ...e, isPinned: false }))
+  );
+
+  setUndoEntry(entry);
+
 
     if (undoTimer) clearTimeout(undoTimer);
 
@@ -310,9 +318,11 @@ const Diary: React.FC<DiaryProps> = ({ entries, onUpdateEntries, onDeleteEntry }
           <p className="text-[10px] font-bold uppercase tracking-widest text-aura-200">
             Pinned Entry 📌
           </p>
-          <p className={`font-serif text-xl mt-3 leading-relaxed whitespace-pre-wrap ${lockMode ? "blur-sm select-none" : ""}`}>
-            {pinnedEntry.content}
-          </p>
+          <DecryptedText
+  text={pinnedEntry.content}
+  lockMode={lockMode}
+/>
+
           <p className="text-aura-200 text-xs mt-4 font-bold">
             {new Date(pinnedEntry.timestamp).toLocaleString()}
           </p>
